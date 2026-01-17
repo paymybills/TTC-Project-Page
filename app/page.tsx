@@ -49,7 +49,7 @@ const VIZ_DESCRIPTIONS: Record<string, { title: string; text: string }> = {
   },
   calculus: {
     title: "Calculus & Motion",
-    text: "Riemann Surface. A Helicoid surface representing multi-valued functions in complex analysis. It visualizes the geometry of smooth, continuous change."
+    text: "Enneper Surface. A fundamental minimal surface in differential geometry. It demonstrates how optimization (calculus of variations) creates elegant, self-intersecting structures."
   },
   series: {
     title: "Fourier Series",
@@ -244,17 +244,17 @@ export default function Home() {
 
         targets.topology.push(kx * 4, ky * 4, kz * 4);
 
-        // 11. Calculus (Riemann Surface - Helicoid)
-        // x = r cos(v), y = r sin(v), z = v
-        // u = r (radius), v = theta (angle)
-        const cU = (i / pCount) * 10 - 5; // Radius range
-        const cV = (i % 50) * 0.2 * Math.PI; // Angle
+        // 11. Calculus (Enneper Surface)
+        // u, v in [-2, 2] approx
+        const range = 2.5;
+        const eU = ((i % 50) / 50) * 2 * range - range;
+        const eV = (i / pCount) * 2 * range - range;
 
-        const hx = cU * Math.cos(cV);
-        const hy = cU * Math.sin(cV);
-        const hz = cV / 2 - 5; // Height scaled
+        const ex = eU - (eU * eU * eU) / 3 + eU * eV * eV;
+        const ey = eV - (eV * eV * eV) / 3 + eV * eU * eU;
+        const ez = eU * eU - eV * eV;
 
-        targets.calculus.push(hx * 2, hy * 2, hz * 2);
+        targets.calculus.push(ex * 3, ey * 3, ez * 3);
 
         // 12. Series (Spherical Harmonics)
         // r = |Y(theta, phi)|^2 or similar
