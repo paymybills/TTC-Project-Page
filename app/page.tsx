@@ -369,9 +369,9 @@ export default function Home() {
       </nav>
 
       {/* Insight Overlay */}
-      <div className="fixed bottom-8 right-8 z-40 max-w-sm hidden md:block">
+      <div className="fixed bottom-4 left-4 right-4 z-40 md:right-8 md:bottom-8 md:w-auto md:left-auto md:max-w-sm">
         <motion.div
-          className="glass-panel p-6 border-l-2 border-l-math-gold bg-black/60 backdrop-blur-md"
+          className="glass-panel p-4 md:p-6 border-l-2 border-l-math-gold bg-black/40 backdrop-blur-md"
           animate={{ opacity: isUpdatingInsight ? 0 : 1, y: isUpdatingInsight ? 10 : 0 }}
         >
           <h4 className="text-math-gold font-serif text-lg italic mb-2">{insight.title}</h4>
@@ -531,7 +531,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-black/60 backdrop-blur-xl border border-white/10 p-1 md:p-2 rounded-lg">
+            <div className="bg-black/30 backdrop-blur-xl border border-white/10 p-1 md:p-2 rounded-lg">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-1">
 
                 {/* Neural Net */}

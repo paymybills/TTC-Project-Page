@@ -30,8 +30,8 @@
 
 /* Glass Panel */
 .glass-panel {
-  background: rgba(10, 10, 10, 0.7);
-  backdrop-filter: blur(10px);
+  background: rgba(10, 10, 10, 0.4);
+  backdrop-filter: blur(8px);
   border: 1px solid rgba(212, 175, 55, 0.2);
   transition: all 0.3s ease;
 }
