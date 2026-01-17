@@ -294,7 +294,7 @@ export default function Home() {
     // UPDATE LOOPS
     const updateLines = () => {
       const mode = configRef.current.mode;
-      if (mode === 'lorenz' || mode === 'quant') {
+      if (mode === 'lorenz' || mode === 'quant' || mode === 'series' || mode === 'topology') {
         linesMesh.visible = false;
         return;
       }
