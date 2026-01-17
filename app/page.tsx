@@ -404,7 +404,7 @@ export default function Home() {
               className="font-serif text-5xl md:text-7xl lg:text-8xl font-thin leading-tight mb-8"
             >
               The Geometry of <br />
-              <span className="italic text-math-gold-light"><Thought></Thought></span>
+              <span className="italic text-math-gold-light">Thought</span>
             </motion.h1>
             <motion.p
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.4 }}
