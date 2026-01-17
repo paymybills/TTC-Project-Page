@@ -376,6 +376,31 @@ export default function Home() {
         particles.geometry.attributes.color.needsUpdate = true;
       }
 
+      // Universal Rotation Reset & Logic
+      // Default: Reset all to 0 first
+      particles.rotation.set(0, 0, 0);
+      linesMesh.rotation.set(0, 0, 0);
+
+      // Apply specific rotations per mode
+      if (['lorenz', 'nash', 'orbit'].includes(mode)) {
+        particles.rotation.y = time * 0.1;
+        linesMesh.rotation.y = time * 0.1;
+      } else if (mode === 'topology') {
+        particles.rotation.y = time * 0.1;
+        particles.rotation.x = time * 0.1;
+        // No lines for topology
+      } else if (mode === 'calculus') {
+        particles.rotation.z = time * 0.1;
+        // No lines for calculus
+      } else if (mode === 'series') {
+        particles.rotation.y = time * 0.2;
+        // No lines for series
+      } else if (mode === 'limitless') {
+        // Keep if we revert, or for legacy safety
+        particles.rotation.y = time * 0.05;
+        particles.rotation.x = time * 0.05;
+      }
+
       // Movement
       for (let i = 0; i < configRef.current.particleCount; i++) {
         const i3 = i * 3;
@@ -383,9 +408,7 @@ export default function Home() {
 
         // Note: In a real refactor, use a map or switch, but maintaining provided logic structure
         if (mode === 'graph') {
-          tx = targets.graph[i3] + Math.sin(time + i) * 0.5;
-          ty = targets.graph[i3 + 1] + Math.cos(time + i * 0.5) * 0.5;
-          tz = targets.graph[i3 + 2];
+          tx = targets.graph[i3]; ty = targets.graph[i3 + 1]; tz = targets.graph[i3 + 2];
         } else if (mode === 'orbit') {
           tx = targets.orbit[i3]; ty = targets.orbit[i3 + 1] + Math.sin(time * 2 + i) * 1.5; tz = targets.orbit[i3 + 2];
         } else if (mode === 'matrix') {
@@ -405,16 +428,10 @@ export default function Home() {
         } else if (mode === 'golden') {
           tx = targets.golden[i3]; ty = targets.golden[i3 + 1]; tz = targets.golden[i3 + 2];
         } else if (mode === 'topology') {
-          particles.rotation.y = time * 0.1;
-          particles.rotation.x = time * 0.1;
           tx = targets.topology[i3]; ty = targets.topology[i3 + 1]; tz = targets.topology[i3 + 2];
         } else if (mode === 'calculus') {
-          // Rotate knot
-          particles.rotation.z = time * 0.1;
           tx = targets.calculus[i3]; ty = targets.calculus[i3 + 1]; tz = targets.calculus[i3 + 2];
         } else if (mode === 'series') {
-          // Rotate harmonics
-          particles.rotation.y = time * 0.2;
           tx = targets.series[i3]; ty = targets.series[i3 + 1]; tz = targets.series[i3 + 2];
         }
 
