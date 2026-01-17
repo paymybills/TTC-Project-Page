@@ -371,7 +371,7 @@ export default function Home() {
       {/* Insight Overlay */}
       <div className="fixed bottom-4 left-4 right-4 z-40 md:right-8 md:bottom-8 md:w-auto md:left-auto md:max-w-sm">
         <motion.div
-          className="glass-panel p-4 md:p-6 border-l-2 border-l-math-gold bg-black/40 backdrop-blur-md"
+          className="glass-panel p-4 md:p-6 border-l-2 border-l-math-gold bg-black/20 backdrop-blur-md"
           animate={{ opacity: isUpdatingInsight ? 0 : 1, y: isUpdatingInsight ? 10 : 0 }}
         >
           <h4 className="text-math-gold font-serif text-lg italic mb-2">{insight.title}</h4>
@@ -423,7 +423,7 @@ export default function Home() {
                   <button
                     key={m}
                     onClick={() => changeVizMode(m)}
-                    className={`relative bg-black/60 border px-5 py-3 font-sans text-xs uppercase tracking-widest transition-all duration-300 w-32 flex items-center justify-center gap-2 overflow-hidden
+                    className={`relative bg-black/40 border px-5 py-3 font-sans text-xs uppercase tracking-widest transition-all duration-300 w-32 flex items-center justify-center gap-2 overflow-hidden
                                     ${vizMode === m ? 'border-math-gold text-white bg-math-gold/10' : 'border-white/15 text-white/70 hover:border-math-gold hover:text-white'}
                                 `}
                   >
@@ -458,7 +458,7 @@ export default function Home() {
                   { symbol: '∫', label: 'Calculus' },
                   { symbol: 'Σ', label: 'Series' }
                 ].map((item, i) => (
-                  <div key={i} className="glass-panel p-6 text-center border border-math-gold/20 bg-black/40 backdrop-blur-sm">
+                  <div key={i} className="glass-panel p-6 text-center border border-math-gold/20 bg-black/20 backdrop-blur-sm">
                     <div className="text-3xl font-serif text-math-gold mb-2">{item.symbol}</div>
                     <div className="text-xs uppercase tracking-widest text-white/60">{item.label}</div>
                   </div>
@@ -469,7 +469,7 @@ export default function Home() {
         </section>
 
         {/* Research (Foundations Cards) */}
-        <section id="research" className="py-24 bg-math-black/30">
+        <section id="research" className="py-24 bg-transparent">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
               <h2 className="font-serif text-4xl text-white mb-4">Core Foundations</h2>
@@ -478,16 +478,16 @@ export default function Home() {
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               {/* Dynamical Systems */}
-              <div className="glass-panel p-8 group cursor-pointer border border-white/10 hover:border-math-gold/50 bg-black/50 transition-all" onClick={() => changeVizMode('threebody')}>
-                <div className="h-24 mb-6 border border-white/10 bg-black/30 relative overflow-hidden flex items-center justify-center">
+              <div className="glass-panel p-8 group cursor-pointer border border-white/10 hover:border-math-gold/50 bg-black/20 transition-all" onClick={() => changeVizMode('threebody')}>
+                <div className="h-24 mb-6 border border-white/10 bg-black/10 relative overflow-hidden flex items-center justify-center">
                   <div className="w-12 h-12 border border-math-gold rounded-full animate-[spin_8s_linear_infinite] opacity-50 group-hover:opacity-100"></div>
                 </div>
                 <h3 className="text-lg font-serif text-white mb-2 group-hover:text-math-gold transition-colors">Dynamical Systems</h3>
               </div>
 
               {/* Random Graphs */}
-              <div className="glass-panel p-8 group cursor-pointer border border-white/10 hover:border-math-gold/50 bg-black/50 transition-all" onClick={() => changeVizMode('graph')}>
-                <div className="h-24 mb-6 border border-white/10 bg-black/30 relative overflow-hidden flex items-center justify-center">
+              <div className="glass-panel p-8 group cursor-pointer border border-white/10 hover:border-math-gold/50 bg-black/20 transition-all" onClick={() => changeVizMode('graph')}>
+                <div className="h-24 mb-6 border border-white/10 bg-black/10 relative overflow-hidden flex items-center justify-center">
                   <div className="flex gap-1 opacity-50 group-hover:opacity-100">
                     <div className="w-1 h-8 bg-math-gold/50"></div>
                     <div className="w-1 h-5 bg-white/50"></div>
@@ -498,8 +498,8 @@ export default function Home() {
               </div>
 
               {/* Cellular Automata */}
-              <div className="glass-panel p-8 group cursor-pointer border border-white/10 hover:border-math-gold/50 bg-black/50 transition-all" onClick={() => changeVizMode('matrix')}>
-                <div className="h-24 mb-6 border border-white/10 bg-black/30 relative overflow-hidden flex items-center justify-center">
+              <div className="glass-panel p-8 group cursor-pointer border border-white/10 hover:border-math-gold/50 bg-black/20 transition-all" onClick={() => changeVizMode('matrix')}>
+                <div className="h-24 mb-6 border border-white/10 bg-black/10 relative overflow-hidden flex items-center justify-center">
                   <div className="grid grid-cols-4 gap-1 opacity-50 group-hover:opacity-100">
                     <div className="w-1 h-1 bg-white"></div><div className="w-1 h-1 bg-math-gold"></div>
                     <div className="w-1 h-1 bg-white"></div><div className="w-1 h-1 bg-white"></div>
@@ -510,8 +510,8 @@ export default function Home() {
               </div>
 
               {/* Chaos Theory */}
-              <div className="glass-panel p-8 group cursor-pointer border border-white/10 hover:border-math-gold/50 bg-black/50 transition-all" onClick={() => changeVizMode('lorenz')}>
-                <div className="h-24 mb-6 border border-white/10 bg-black/30 relative overflow-hidden flex items-center justify-center">
+              <div className="glass-panel p-8 group cursor-pointer border border-white/10 hover:border-math-gold/50 bg-black/20 transition-all" onClick={() => changeVizMode('lorenz')}>
+                <div className="h-24 mb-6 border border-white/10 bg-black/10 relative overflow-hidden flex items-center justify-center">
                   <div className="w-10 h-10 border border-white/30 rounded-[50%_20%_50%_20%] rotate-45 group-hover:border-math-gold transition-colors"></div>
                 </div>
                 <h3 className="text-lg font-serif text-white mb-2 group-hover:text-math-gold transition-colors">Chaos Theory</h3>
@@ -531,11 +531,11 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-black/30 backdrop-blur-xl border border-white/10 p-1 md:p-2 rounded-lg">
+            <div className="bg-transparent border-none p-0 rounded-lg">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-1">
 
                 {/* Neural Net */}
-                <button onClick={() => changeVizMode('neural')} className="group relative bg-white/5 hover:bg-white/10 p-8 text-left transition-all border border-transparent hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
+                <button onClick={() => changeVizMode('neural')} className="group relative bg-black/20 hover:bg-black/40 backdrop-blur-sm p-8 text-left transition-all border border-white/10 hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
                   <div className="flex justify-between items-start z-10 relative">
                     <span className="text-math-gold text-xl font-serif">I.</span>
                     <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
@@ -548,7 +548,7 @@ export default function Home() {
                 </button>
 
                 {/* Quant */}
-                <button onClick={() => changeVizMode('quant')} className="group relative bg-white/5 hover:bg-white/10 p-8 text-left transition-all border border-transparent hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
+                <button onClick={() => changeVizMode('quant')} className="group relative bg-black/20 hover:bg-black/40 backdrop-blur-sm p-8 text-left transition-all border border-white/10 hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
                   <div className="flex justify-between items-start z-10 relative">
                     <span className="text-math-gold text-xl font-serif">II.</span>
                     <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
@@ -561,7 +561,7 @@ export default function Home() {
                 </button>
 
                 {/* Nash */}
-                <button onClick={() => changeVizMode('nash')} className="group relative bg-white/5 hover:bg-white/10 p-8 text-left transition-all border border-transparent hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
+                <button onClick={() => changeVizMode('nash')} className="group relative bg-black/20 hover:bg-black/40 backdrop-blur-sm p-8 text-left transition-all border border-white/10 hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
                   <div className="flex justify-between items-start z-10 relative">
                     <span className="text-math-gold text-xl font-serif">III.</span>
                     <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]"></div>
