@@ -43,9 +43,9 @@ const VIZ_DESCRIPTIONS: Record<string, { title: string; text: string }> = {
     title: "The Golden Ratio",
     text: "Phyllotaxis Optimization. Nature uses the ratio φ (1.618...) to pack seeds efficiently. Each particle is placed at 137.5° from the previous one."
   },
-  limitless: {
-    title: "Limitless Scaling",
-    text: "The Möbius Strip. A non-orientable surface with only one side and one edge. It represents the concept of infinity, continuity, and the seamless nature of mathematical space."
+  topology: {
+    title: "Topology",
+    text: "The Klein Bottle. A non-orientable surface that has no distinct 'inside' or 'outside'. It demonstrates how space can be twisted and reconnected in higher dimensions."
   },
   calculus: {
     title: "Calculus & Motion",
@@ -139,7 +139,7 @@ export default function Home() {
     const targets = {
       graph: [] as number[], orbit: [] as number[], matrix: [] as number[], threebody: [] as number[],
       neural: [] as number[], quant: [] as number[], nash: [] as number[], lorenz: [] as number[],
-      golden: [] as number[], limitless: [] as number[], calculus: [] as number[], series: [] as number[]
+      golden: [] as number[], topology: [] as number[], calculus: [] as number[], series: [] as number[]
     };
 
     // INITIALIZATION
@@ -226,17 +226,23 @@ export default function Home() {
         const radius = 0.5 * Math.sqrt(i);
         targets.golden.push(Math.cos(theta) * radius, (i / pCount) * 10 - 5, Math.sin(theta) * radius);
 
-        // 10. Limitless (Möbius Strip)
-        // u in [0, 2pi], v in [-w, w]
+        // 10. Topology (Klein Bottle - Figure 8 Immersion)
+        // u in [0, 2pi], v in [0, 2pi]
         const u = (i / pCount) * Math.PI * 2;
-        const v = (Math.random() - 0.5) * 5; // Width
-        const mobR = 12;
+        const v = (i % 50) * (Math.PI * 2 / 50);
+        const r = 3;
 
-        const mobX = (mobR + v * Math.cos(u / 2)) * Math.cos(u);
-        const mobY = (mobR + v * Math.cos(u / 2)) * Math.sin(u);
-        const mobZ = v * Math.sin(u / 2);
+        const cosU = Math.cos(u), sinU = Math.sin(u);
+        const cosU2 = Math.cos(u / 2), sinU2 = Math.sin(u / 2);
+        const cosV = Math.cos(v), sinV = Math.sin(v);
+        const sin2V = Math.sin(2 * v);
 
-        targets.limitless.push(mobX, mobY, mobZ);
+        // Figure-8 Klein Bottle equations
+        const kx = (r + cosU2 * sinV - sinU2 * sin2V) * cosU;
+        const ky = (r + cosU2 * sinV - sinU2 * sin2V) * sinU;
+        const kz = sinU2 * sinV + cosU2 * sin2V;
+
+        targets.topology.push(kx * 4, ky * 4, kz * 4);
 
         // 11. Calculus (Torus Knot)
         // p, q integers coprime. (3, 4) is nice.
@@ -397,11 +403,10 @@ export default function Home() {
           tx = targets.lorenz[i3]; ty = targets.lorenz[i3 + 1]; tz = targets.lorenz[i3 + 2];
         } else if (mode === 'golden') {
           tx = targets.golden[i3]; ty = targets.golden[i3 + 1]; tz = targets.golden[i3 + 2];
-        } else if (mode === 'limitless') {
-          // Slow rotation to show depth
-          particles.rotation.y = time * 0.05;
-          particles.rotation.x = time * 0.05;
-          tx = targets.limitless[i3]; ty = targets.limitless[i3 + 1]; tz = targets.limitless[i3 + 2];
+        } else if (mode === 'topology') {
+          particles.rotation.y = time * 0.1;
+          particles.rotation.x = time * 0.1;
+          tx = targets.topology[i3]; ty = targets.topology[i3 + 1]; tz = targets.topology[i3 + 2];
         } else if (mode === 'calculus') {
           // Rotate knot
           particles.rotation.z = time * 0.1;
@@ -569,7 +574,7 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-4">
                 {[
                   { symbol: 'φ', label: 'Golden Ratio', mode: 'golden' },
-                  { symbol: '∞', label: 'Limitless', mode: 'limitless' },
+                  { symbol: 'τ', label: 'Topology', mode: 'topology' },
                   { symbol: '∫', label: 'Calculus', mode: 'calculus' },
                   { symbol: 'Σ', label: 'Series', mode: 'series' }
                 ].map((item, i) => (
