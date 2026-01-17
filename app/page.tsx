@@ -37,6 +37,23 @@ const VIZ_DESCRIPTIONS: Record<string, { title: string; text: string }> = {
   nash: {
     title: "Nash Equilibrium",
     text: "A Hyperbolic Paraboloid (Saddle Point). In Game Theory, this represents the Minimax solution where one player minimizes loss while the other maximizes gain."
+  },
+  // NEW VIZ MODES
+  golden: {
+    title: "The Golden Ratio",
+    text: "Phyllotaxis Optimization. Nature uses the ratio φ (1.618...) to pack seeds efficiently. Each particle is placed at 137.5° from the previous one."
+  },
+  limitless: {
+    title: "Limitless Scaling",
+    text: "Fractal Geometry. Self-similar structures repeating at different scales. This represents infinite recursion and the complexity within simplicity."
+  },
+  calculus: {
+    title: "Calculus & Motion",
+    text: "Vector Fields. Particles following a parametric curve r(t). The lines represent tangent vectors (derivatives), visualizing velocity and rate of change."
+  },
+  series: {
+    title: "Fourier Series",
+    text: "Harmonic Analysis. Complex functions decomposed into sums of simple sines and cosines. Epicycles rotating on epicycles to trace arbitrary shapes."
   }
 };
 
@@ -45,6 +62,29 @@ export default function Home() {
   const [vizMode, setVizMode] = useState('graph');
   const [insight, setInsight] = useState(VIZ_DESCRIPTIONS['graph']);
   const [isUpdatingInsight, setIsUpdatingInsight] = useState(false);
+  const [isOverlayMinimized, setIsOverlayMinimized] = useState(false);
+
+  // Auto-minimize overlay on mobile after generic interaction or time
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    const handleScroll = () => {
+      // Only minimize on mobile/small screens if needed, or generally
+      if (window.innerWidth < 768) {
+        setIsOverlayMinimized(true);
+      }
+    };
+
+    // Initial timer
+    timeout = setTimeout(() => {
+      if (window.innerWidth < 768) setIsOverlayMinimized(true);
+    }, 5000);
+
+    window.addEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      clearTimeout(timeout);
+    };
+  }, []);
 
   // Configuration Ref to share state with Three.js loop without re-renders
   const configRef = useRef({
@@ -98,7 +138,8 @@ export default function Home() {
     // TARGET POSITIONS
     const targets = {
       graph: [] as number[], orbit: [] as number[], matrix: [] as number[], threebody: [] as number[],
-      neural: [] as number[], quant: [] as number[], nash: [] as number[], lorenz: [] as number[]
+      neural: [] as number[], quant: [] as number[], nash: [] as number[], lorenz: [] as number[],
+      golden: [] as number[], limitless: [] as number[], calculus: [] as number[], series: [] as number[]
     };
 
     // INITIALIZATION
@@ -172,11 +213,45 @@ export default function Home() {
         targets.nash.push(sx, sy, sz);
 
         // 8. Lorenz
-        const dx = sigma * (ly - lx) * dt;
-        const dy = (lx * (rho - lz) - ly) * dt;
-        const dz = (lx * ly - beta * lz) * dt;
         lx += dx; ly += dy; lz += dz;
         targets.lorenz.push(lx * 0.8, ly * 0.8, (lz - 25) * 0.8);
+
+        // 9. Golden Ratio (Phyllotaxis)
+        // angle = i * 137.5 deg, r = c * sqrt(n)
+        const phi = 137.5 * (Math.PI / 180);
+        const theta = i * phi;
+        const radius = 0.5 * Math.sqrt(i);
+        targets.golden.push(Math.cos(theta) * radius, (i / pCount) * 10 - 5, Math.sin(theta) * radius);
+
+        // 10. Limitless (Fractal / Sierpinski-ish or Zoom)
+        // Simple 3D Fractal layout approximation
+        const scale = 15;
+        const fracIter = i % 4; // 4 recursive points
+        let fx = 0, fy = 0, fz = 0;
+        if (fracIter === 0) { fx = scale; fy = scale; fz = 0; }
+        else if (fracIter === 1) { fx = -scale; fy = scale; fz = 0; }
+        else if (fracIter === 2) { fx = 0; fy = -scale; fz = scale; }
+        else { fx = 0; fy = -scale; fz = -scale; }
+        // Add randomness for volume
+        targets.limitless.push(
+          fx * (Math.random() + 0.5) * 0.5 + (Math.random() - 0.5) * 5,
+          fy * (Math.random() + 0.5) * 0.5 + (Math.random() - 0.5) * 5,
+          fz * (Math.random() + 0.5) * 0.5 + (Math.random() - 0.5) * 5
+        );
+
+        // 11. Calculus (Helix with Tangents)
+        // Helix: x = r cos(t), z = r sin(t), y = t
+        const ct = (i / pCount) * Math.PI * 8; // 4 rotations
+        const cr = 8;
+        targets.calculus.push(Math.cos(ct) * cr, (ct / (Math.PI * 8)) * 30 - 15, Math.sin(ct) * cr);
+
+        // 12. Series (Fourier Epicycles)
+        // Two circles added
+        const ft = (i / pCount) * Math.PI * 2;
+        const r1 = 8, r2 = 3;
+        const fSeriesX = r1 * Math.cos(ft) + r2 * Math.cos(4 * ft);
+        const fSeriesY = r1 * Math.sin(ft) + r2 * Math.sin(4 * ft);
+        targets.series.push(fSeriesX, fSeriesY, (i / pCount) * 10 - 5);
       }
 
       particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -312,6 +387,19 @@ export default function Home() {
           tx = targets.nash[i3]; ty = targets.nash[i3 + 1]; tz = targets.nash[i3 + 2];
         } else if (mode === 'lorenz') {
           tx = targets.lorenz[i3]; ty = targets.lorenz[i3 + 1]; tz = targets.lorenz[i3 + 2];
+        } else if (mode === 'golden') {
+          tx = targets.golden[i3]; ty = targets.golden[i3 + 1]; tz = targets.golden[i3 + 2];
+        } else if (mode === 'limitless') {
+          // Slowly rotate fractal components?
+          tx = targets.limitless[i3]; ty = targets.limitless[i3 + 1]; tz = targets.limitless[i3 + 2];
+        } else if (mode === 'calculus') {
+          // Move along curve? Static curve for now is fine, maybe pulse along it
+          tx = targets.calculus[i3]; ty = targets.calculus[i3 + 1]; tz = targets.calculus[i3 + 2];
+        } else if (mode === 'series') {
+          // Rotate epicycles over time
+          // Re-calc position based on time for 'alive' feeling? 
+          // For simple morph, target array is static, let's keep it static but rotate whole group later
+          tx = targets.series[i3]; ty = targets.series[i3 + 1]; tz = targets.series[i3 + 2];
         }
 
         positions[i3] += (tx - positions[i3]) * 0.04;
@@ -361,13 +449,18 @@ export default function Home() {
               </div>
               <span className="font-serif text-2xl font-bold tracking-wide text-white">THE TURING CIRCLE</span>
             </div>
-            <div className="hidden md:block">
-              <div className="ml-10 flex items-baseline space-x-8 text-sm font-medium tracking-widest uppercase">
-                <a href="#home" className="nav-link text-white hover:text-math-gold px-3 py-2 transition-colors">Home</a>
-                <a href="#manifesto" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Manifesto</a>
-                <a href="#research" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Foundations</a>
-                <a href="#domains" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Domains</a>
-                <a href="https://theturingcircle.vercel.app/" target="_blank" className="btn-gold px-4 py-2 rounded-sm uppercase">Join Club</a>
+            <div className="flex items-center gap-4">
+              {/* Mobile: Join Club Button Visible */}
+              <a href="https://theturingcircle.vercel.app/" target="_blank" className="md:hidden btn-gold px-3 py-1.5 text-xs rounded-sm uppercase">Join</a>
+
+              <div className="hidden md:block">
+                <div className="ml-10 flex items-baseline space-x-8 text-sm font-medium tracking-widest uppercase">
+                  <a href="#home" className="nav-link text-white hover:text-math-gold px-3 py-2 transition-colors">Home</a>
+                  <a href="#manifesto" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Manifesto</a>
+                  <a href="#research" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Foundations</a>
+                  <a href="#domains" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Domains</a>
+                  <a href="https://theturingcircle.vercel.app/" target="_blank" className="btn-gold px-4 py-2 rounded-sm uppercase">Join Club</a>
+                </div>
               </div>
             </div>
           </div>
@@ -377,8 +470,14 @@ export default function Home() {
       {/* Insight Overlay */}
       <div className="fixed bottom-4 left-4 right-4 z-40 md:right-8 md:bottom-8 md:w-auto md:left-auto md:max-w-sm">
         <motion.div
-          className="glass-panel p-4 md:p-6 border-l-2 border-l-math-gold bg-black/20 backdrop-blur-md"
-          animate={{ opacity: isUpdatingInsight ? 0 : 1, y: isUpdatingInsight ? 10 : 0 }}
+          className="glass-panel p-4 md:p-6 border-l-2 border-l-math-gold bg-black/20 backdrop-blur-md cursor-pointer"
+          onClick={() => setIsOverlayMinimized(!isOverlayMinimized)}
+          animate={{
+            opacity: isUpdatingInsight ? 0 : (isOverlayMinimized ? 0.6 : 1),
+            y: isUpdatingInsight ? 10 : (isOverlayMinimized ? 120 : 0),
+            scale: isOverlayMinimized ? 0.9 : 1
+          }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
         >
           <h4 className="text-math-gold font-serif text-lg italic mb-2">{insight.title}</h4>
           <p className="text-xs text-gray-300 leading-relaxed">{insight.text}</p>
@@ -459,15 +558,19 @@ export default function Home() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { symbol: 'φ', label: 'Golden Ratio' },
-                  { symbol: '∞', label: 'Limitless' },
-                  { symbol: '∫', label: 'Calculus' },
-                  { symbol: 'Σ', label: 'Series' }
+                  { symbol: 'φ', label: 'Golden Ratio', mode: 'golden' },
+                  { symbol: '∞', label: 'Limitless', mode: 'limitless' },
+                  { symbol: '∫', label: 'Calculus', mode: 'calculus' },
+                  { symbol: 'Σ', label: 'Series', mode: 'series' }
                 ].map((item, i) => (
-                  <div key={i} className="glass-panel p-6 text-center border border-math-gold/20 bg-black/20 backdrop-blur-sm">
+                  <button
+                    key={i}
+                    onClick={() => changeVizMode(item.mode)}
+                    className="glass-panel p-6 text-center border border-math-gold/20 bg-black/20 backdrop-blur-sm hover:border-math-gold transition-colors w-full"
+                  >
                     <div className="text-3xl font-serif text-math-gold mb-2">{item.symbol}</div>
                     <div className="text-xs uppercase tracking-widest text-white/60">{item.label}</div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
