@@ -49,7 +49,7 @@ const VIZ_DESCRIPTIONS: Record<string, { title: string; text: string }> = {
   },
   calculus: {
     title: "Calculus & Motion",
-    text: "The Torus Knot. A complex parametric curve winding through 3D space. It visualizes continuous flow, vector fields, and the beauty of parametric integration."
+    text: "Riemann Surface. A Helicoid surface representing multi-valued functions in complex analysis. It visualizes the geometry of smooth, continuous change."
   },
   series: {
     title: "Fourier Series",
@@ -244,16 +244,17 @@ export default function Home() {
 
         targets.topology.push(kx * 4, ky * 4, kz * 4);
 
-        // 11. Calculus (Torus Knot)
-        // p, q integers coprime. (3, 4) is nice.
-        const cP = 3, cQ = 4;
-        const cT = (i / pCount) * Math.PI * 2 * 10; // multiple loops
-        const cR = 10 + 4 * Math.cos(cQ * cT);
-        targets.calculus.push(
-          cR * Math.cos(cP * cT),
-          cR * Math.sin(cP * cT),
-          4 * Math.sin(cQ * cT)
-        );
+        // 11. Calculus (Riemann Surface - Helicoid)
+        // x = r cos(v), y = r sin(v), z = v
+        // u = r (radius), v = theta (angle)
+        const cU = (i / pCount) * 10 - 5; // Radius range
+        const cV = (i % 50) * 0.2 * Math.PI; // Angle
+
+        const hx = cU * Math.cos(cV);
+        const hy = cU * Math.sin(cV);
+        const hz = cV / 2 - 5; // Height scaled
+
+        targets.calculus.push(hx * 2, hy * 2, hz * 2);
 
         // 12. Series (Spherical Harmonics)
         // r = |Y(theta, phi)|^2 or similar
@@ -294,7 +295,7 @@ export default function Home() {
     // UPDATE LOOPS
     const updateLines = () => {
       const mode = configRef.current.mode;
-      if (mode === 'lorenz' || mode === 'quant' || mode === 'series' || mode === 'topology') {
+      if (mode === 'lorenz' || mode === 'quant' || mode === 'series' || mode === 'topology' || mode === 'calculus') {
         linesMesh.visible = false;
         return;
       }
