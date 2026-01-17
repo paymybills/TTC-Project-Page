@@ -213,6 +213,9 @@ export default function Home() {
         targets.nash.push(sx, sy, sz);
 
         // 8. Lorenz
+        const dx = sigma * (ly - lx) * dt;
+        const dy = (lx * (rho - lz) - ly) * dt;
+        const dz = (lx * ly - beta * lz) * dt;
         lx += dx; ly += dy; lz += dz;
         targets.lorenz.push(lx * 0.8, ly * 0.8, (lz - 25) * 0.8);
 
