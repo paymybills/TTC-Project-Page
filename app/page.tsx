@@ -361,7 +361,7 @@ export default function Home() {
                 <a href="#manifesto" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Manifesto</a>
                 <a href="#research" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Foundations</a>
                 <a href="#domains" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Domains</a>
-                <a href="http://localhost:3000" target="_blank" className="btn-gold px-4 py-2 rounded-sm uppercase">Join Club</a>
+                <a href="https://ttc-landing-page.vercel.app" target="_blank" className="btn-gold px-4 py-2 rounded-sm uppercase">Join Club</a>
               </div>
             </div>
           </div>
