@@ -501,7 +501,7 @@ export default function Home() {
       </nav>
 
       {/* Insight Overlay */}
-      <div className="fixed bottom-4 left-4 right-4 z-40 md:right-8 md:bottom-8 md:w-auto md:left-auto md:max-w-sm">
+      <div className="fixed bottom-24 left-4 right-4 z-40 md:right-8 md:bottom-24 md:w-auto md:left-auto md:max-w-sm">
         <motion.div
           className="glass-panel p-4 md:p-6 border-l-2 border-l-math-gold bg-black/20 backdrop-blur-md cursor-pointer"
           onClick={() => setIsOverlayMinimized(!isOverlayMinimized)}
@@ -728,8 +728,7 @@ export default function Home() {
               <p className="text-white/40 text-xs mt-1">Est. 2025</p>
             </div>
             <div className="flex space-x-6">
-              <a href="#" className="text-white/40 hover:text-math-gold text-sm">Discord</a>
-              <a href="#" className="text-white/40 hover:text-math-gold text-sm">GitHub</a>
+              <a href="https://github.com/Circle-Turing" target="_blank" className="text-white/40 hover:text-math-gold text-sm">GitHub</a>
             </div>
           </div>
         </footer>
