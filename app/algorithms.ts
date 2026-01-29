@@ -8,6 +8,7 @@ export type GridNode = {
   heuristic: number;
   parent: GridNode | null;
   state: 'unvisited' | 'open' | 'closed' | 'path';
+  closedTick?: number; // For comet trail effect
 };
 
 // Heuristic for A* (Manhattan distance)
@@ -22,7 +23,7 @@ export class PathfindingGrid {
     this.width = width;
     this.height = height;
     this.nodes = [];
-    
+
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         this.nodes.push({
@@ -85,6 +86,7 @@ export function* runAStar(grid: PathfindingGrid, start: Point, end: Point) {
   startNode.state = 'open';
 
   let openSet: GridNode[] = [startNode];
+  let step = 0;
 
   while (openSet.length > 0) {
     // Sort by f-score (distance + heuristic) - naive priority queue
@@ -103,6 +105,8 @@ export function* runAStar(grid: PathfindingGrid, start: Point, end: Point) {
     }
 
     current.state = 'closed';
+    step++;
+    current.closedTick = step;
     yield grid.nodes.map(n => n.state); // Yield current state
 
     const neighbors = grid.getNeighbors(current);
@@ -115,8 +119,8 @@ export function* runAStar(grid: PathfindingGrid, start: Point, end: Point) {
         neighbor.heuristic = heuristic(neighbor, endNode);
         neighbor.parent = current;
         if (neighbor.state !== 'open') {
-            neighbor.state = 'open';
-            openSet.push(neighbor);
+          neighbor.state = 'open';
+          openSet.push(neighbor);
         }
       }
     }
@@ -125,132 +129,137 @@ export function* runAStar(grid: PathfindingGrid, start: Point, end: Point) {
 }
 
 export function* runDijkstra(grid: PathfindingGrid, start: Point, end: Point) {
-    // Dijkstra is A* without heuristic
-    grid.reset();
-    const startNode = grid.getNode(start.x, start.y);
-    const endNode = grid.getNode(end.x, end.y);
-  
-    if (!startNode || !endNode || !startNode.walkable || !endNode.walkable) return;
-  
-    startNode.distance = 0;
-    startNode.state = 'open';
-  
-    let openSet: GridNode[] = [startNode];
-  
-    while (openSet.length > 0) {
-      openSet.sort((a, b) => a.distance - b.distance);
-      const current = openSet.shift()!;
-  
-      if (current === endNode) {
-        let temp: GridNode | null = current;
-        while (temp) {
-          temp.state = 'path';
-          temp = temp.parent;
-        }
-        yield grid.nodes.map(n => n.state);
-        return;
+  // Dijkstra is A* without heuristic
+  grid.reset();
+  const startNode = grid.getNode(start.x, start.y);
+  const endNode = grid.getNode(end.x, end.y);
+
+  if (!startNode || !endNode || !startNode.walkable || !endNode.walkable) return;
+
+  startNode.distance = 0;
+  startNode.state = 'open';
+
+  let openSet: GridNode[] = [startNode];
+  let step = 0;
+
+  while (openSet.length > 0) {
+    openSet.sort((a, b) => a.distance - b.distance);
+    const current = openSet.shift()!;
+
+    if (current === endNode) {
+      let temp: GridNode | null = current;
+      while (temp) {
+        temp.state = 'path';
+        temp = temp.parent;
       }
-  
-      current.state = 'closed';
       yield grid.nodes.map(n => n.state);
-  
-      const neighbors = grid.getNeighbors(current);
-      for (const neighbor of neighbors) {
-        if (neighbor.state === 'closed') continue;
-  
-        const tentDist = current.distance + neighbor.cost;
-        if (tentDist < neighbor.distance) {
-          neighbor.distance = tentDist;
-          neighbor.parent = current;
-          if (neighbor.state !== 'open') {
-              neighbor.state = 'open';
-              openSet.push(neighbor);
-          }
+      return;
+    }
+
+    current.state = 'closed';
+    yield grid.nodes.map(n => n.state);
+
+    const neighbors = grid.getNeighbors(current);
+    for (const neighbor of neighbors) {
+      if (neighbor.state === 'closed') continue;
+
+      const tentDist = current.distance + neighbor.cost;
+      if (tentDist < neighbor.distance) {
+        neighbor.distance = tentDist;
+        neighbor.parent = current;
+        if (neighbor.state !== 'open') {
+          neighbor.state = 'open';
+          openSet.push(neighbor);
         }
       }
     }
+  }
 }
 
 export function* runBFS(grid: PathfindingGrid, start: Point, end: Point) {
-    grid.reset();
-    const startNode = grid.getNode(start.x, start.y);
-    const endNode = grid.getNode(end.x, end.y);
-    if (!startNode || !endNode) return;
+  grid.reset();
+  const startNode = grid.getNode(start.x, start.y);
+  const endNode = grid.getNode(end.x, end.y);
+  if (!startNode || !endNode) return;
 
-    const queue: GridNode[] = [startNode];
-    startNode.state = 'open';
-    const visited = new Set<GridNode>();
-    visited.add(startNode);
+  const queue: GridNode[] = [startNode];
+  startNode.state = 'open';
+  const visited = new Set<GridNode>();
+  visited.add(startNode);
+  let step = 0;
 
-    while (queue.length > 0) {
-        const current = queue.shift()!;
-        if (current === endNode) {
-             let temp: GridNode | null = current;
-            while (temp) {
-                temp.state = 'path';
-                temp = temp.parent;
-            }
-            yield grid.nodes.map(n => n.state);
-            return;
-        }
-
-        current.state = 'closed';
-        yield grid.nodes.map(n => n.state);
-
-        for (const neighbor of grid.getNeighbors(current)) {
-            if (!visited.has(neighbor)) {
-                visited.add(neighbor);
-                neighbor.parent = current;
-                neighbor.state = 'open';
-                queue.push(neighbor);
-            }
-        }
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (current === endNode) {
+      let temp: GridNode | null = current;
+      while (temp) {
+        temp.state = 'path';
+        temp = temp.parent;
+      }
+      yield grid.nodes.map(n => n.state);
+      return;
     }
+
+    current.state = 'closed';
+    yield grid.nodes.map(n => n.state);
+
+    for (const neighbor of grid.getNeighbors(current)) {
+      if (!visited.has(neighbor)) {
+        visited.add(neighbor);
+        neighbor.parent = current;
+        neighbor.state = 'open';
+        queue.push(neighbor);
+      }
+    }
+  }
 }
 
 export function* runDFS(grid: PathfindingGrid, start: Point, end: Point) {
-    grid.reset();
-    const startNode = grid.getNode(start.x, start.y);
-    const endNode = grid.getNode(end.x, end.y);
-    if (!startNode || !endNode) return;
+  grid.reset();
+  const startNode = grid.getNode(start.x, start.y);
+  const endNode = grid.getNode(end.x, end.y);
+  if (!startNode || !endNode) return;
 
-    const stack: GridNode[] = [startNode];
-    const visited = new Set<GridNode>();
-    
-    // We don't mark start as visited immediately in stack-based DFS until popped,
-    // or we can to avoid duplicates. Standard iterative DFS:
-    
-    while (stack.length > 0) {
-        const current = stack.pop()!;
-        
-        if (current === endNode) {
-             let temp: GridNode | null = current;
-            while (temp) {
-                temp.state = 'path';
-                temp = temp.parent;
-            }
-            yield grid.nodes.map(n => n.state);
-            return;
-        }
+  const stack: GridNode[] = [startNode];
+  const visited = new Set<GridNode>();
+  let step = 0;
 
-        if (!visited.has(current)) {
-            visited.add(current);
-            current.state = 'closed';
-             yield grid.nodes.map(n => n.state);
+  // We don't mark start as visited immediately in stack-based DFS until popped,
+  // or we can to avoid duplicates. Standard iterative DFS:
 
-            const neighbors = grid.getNeighbors(current);
-            // Randomize neighbors for cool maze effect? Or standard order.
-            // Let's randomize to make it look "organic"
-             neighbors.sort(() => Math.random() - 0.5);
+  while (stack.length > 0) {
+    const current = stack.pop()!;
 
-            for (const neighbor of neighbors) {
-                if (!visited.has(neighbor)) {
-                    neighbor.parent = current;
-                    stack.push(neighbor);
-                    // Visualize visually as "open" (in stack)
-                    neighbor.state = 'open'; 
-                }
-            }
-        }
+    if (current === endNode) {
+      let temp: GridNode | null = current;
+      while (temp) {
+        temp.state = 'path';
+        temp = temp.parent;
+      }
+      yield grid.nodes.map(n => n.state);
+      return;
     }
+
+    if (!visited.has(current)) {
+      visited.add(current);
+      current.state = 'closed';
+      step++;
+      current.closedTick = step;
+      yield grid.nodes.map(n => n.state);
+
+      const neighbors = grid.getNeighbors(current);
+      // Randomize neighbors for cool maze effect? Or standard order.
+      // Let's randomize to make it look "organic"
+      neighbors.sort(() => Math.random() - 0.5);
+
+      for (const neighbor of neighbors) {
+        if (!visited.has(neighbor)) {
+          neighbor.parent = current;
+          stack.push(neighbor);
+          // Visualize visually as "open" (in stack)
+          neighbor.state = 'open';
+        }
+      }
+    }
+  }
 }

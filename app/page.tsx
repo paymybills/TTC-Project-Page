@@ -470,8 +470,16 @@ export default function Home() {
               // FINAL PATH: Pure Beam White
               colors[i3] = 1.0; colors[i3 + 1] = 1.0; colors[i3 + 2] = 1.0;
             } else if (node.state === 'closed') {
-              // TRAIL (Visited): Shiny Halo Gold (Brighter)
-              colors[i3] = 1.0; colors[i3 + 1] = 0.85; colors[i3 + 2] = 0.3;
+              // TRAIL (Visited): Comet Trail Effect
+              // decay based on how long ago it was closed
+              const currentStep = Math.floor(algoRunnerRef.current.timer / 2);
+              const age = currentStep - (node.closedTick || 0);
+              const decay = Math.max(0, 1 - age * 0.03); // Fade out over ~30 steps
+
+              // Halo Gold (1.0, 0.85, 0.3) fading to Darker Gold (0.4, 0.3, 0.1)
+              colors[i3] = 0.4 + (0.6 * decay);
+              colors[i3 + 1] = 0.3 + (0.55 * decay);
+              colors[i3 + 2] = 0.1 + (0.2 * decay);
             } else if (node.state === 'open') {
               // FRONTIER: Hot Spark Orange
               colors[i3] = 1.0; colors[i3 + 1] = 0.6; colors[i3 + 2] = 0.1;
@@ -739,7 +747,7 @@ export default function Home() {
         <section id="research" className="py-24 bg-transparent">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
-              <h2 className="font-serif text-4xl text-white mb-4">Core Foundations</h2>
+              <h2 className="font-serif text-4xl text-white mb-4">Algorithms and Tinkerings</h2>
               <p className="text-white/50 font-mono text-sm">/root/simulations/foundations</p>
             </div>
 
