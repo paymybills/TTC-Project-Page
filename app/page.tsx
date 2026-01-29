@@ -467,14 +467,14 @@ export default function Home() {
               // Wall - Dark Grey
               colors[i3] = 0.1; colors[i3 + 1] = 0.1; colors[i3 + 2] = 0.1;
             } else if (node.state === 'path') {
-              // FINAL PATH: Bright White
+              // FINAL PATH: Pure Beam White
               colors[i3] = 1.0; colors[i3 + 1] = 1.0; colors[i3 + 2] = 1.0;
             } else if (node.state === 'closed') {
-              // TRAIL (Visited): Gold
-              colors[i3] = 0.83; colors[i3 + 1] = 0.68; colors[i3 + 2] = 0.21;
+              // TRAIL (Visited): Shiny Halo Gold (Brighter)
+              colors[i3] = 1.0; colors[i3 + 1] = 0.85; colors[i3 + 2] = 0.3;
             } else if (node.state === 'open') {
-              // FRONTIER: Bright Yellow/Orange
-              colors[i3] = 1.0; colors[i3 + 1] = 0.8; colors[i3 + 2] = 0.0;
+              // FRONTIER: Hot Spark Orange
+              colors[i3] = 1.0; colors[i3 + 1] = 0.6; colors[i3 + 2] = 0.1;
             } else {
               // Unvisited - Faint
               colors[i3] = 0.2; colors[i3 + 1] = 0.2; colors[i3 + 2] = 0.2;
