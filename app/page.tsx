@@ -295,7 +295,6 @@ export default function Home() {
           sR * Math.sin(sPhi) * Math.cos(sTheta),
           sR * Math.sin(sPhi) * Math.sin(sTheta),
           sR * Math.cos(sPhi)
-          sR * Math.cos(sPhi)
         );
 
         // 13. Algorithm Grid (A*, Dijkstra, etc.)
