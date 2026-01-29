@@ -327,548 +327,582 @@ export default function Home() {
     const createLines = () => {
       const linesGeometry = new THREE.BufferGeometry();
       const linesMaterial = new THREE.LineBasicMaterial({
-        color: 0xD4AF37, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending
+        color: 0xD4AF37, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending
       });
       linesMesh = new THREE.LineSegments(linesGeometry, linesMaterial);
       scene.add(linesMesh);
     };
 
     // UPDATE LOOPS
-    const updateLines = () => {
-      const mode = configRef.current.mode;
-      if (['lorenz', 'quant', 'series', 'topology', 'calculus', 'astar', 'dijkstra', 'bfs', 'dfs'].includes(mode)) {
+    const mode = configRef.current.mode;
+
+    // Algorithm Modes: Draw Search Tree
+    if (['astar', 'dijkstra', 'bfs', 'dfs'].includes(mode)) {
+      if (!algoRunnerRef.current.grid) {
         linesMesh.visible = false;
         return;
       }
-
       linesMesh.visible = true;
-      const positions = particles.geometry.attributes.position.array as Float32Array;
       const linePositions = [];
-      const checkLimit = isMobile ? 15 : 40;
-      const limit = configRef.current.particleCount;
-      const step = isMobile ? 3 : 2;
 
-      for (let i = 0; i < limit; i += step) {
-        for (let j = i + 1; j < Math.min(i + checkLimit, limit); j++) {
-          const dx = positions[i * 3] - positions[j * 3];
-          const dy = positions[i * 3 + 1] - positions[j * 3 + 1];
-          const dz = positions[i * 3 + 2] - positions[j * 3 + 2];
-          const distSq = dx * dx + dy * dy + dz * dz;
+      // Connect nodes to parents
+      const grid = algoRunnerRef.current.grid;
+      // Optimization: Only draw for nodes that are part of the algo state
+      for (let i = 0; i < grid.nodes.length; i++) {
+        const node = grid.nodes[i];
+        if (node.parent && (node.state === 'closed' || node.state === 'path' || node.state === 'open')) {
+          const pIdx = node.parent.y * grid.width + node.parent.x;
 
-          let threshold = 12;
-          if (mode === 'neural') threshold = 30;
-          if (mode === 'nash') threshold = 8;
-          if (mode === 'matrix') threshold = 14;
-
-          if (distSq < threshold) {
+          // Get actual 3D positions mapping
+          // We need to know where the particles are. 
+          // In algo mode, particles[i] corresponds to grid.nodes[i] ONLY if particleCount >= grid size.
+          // Since we create grid based on particleCount (width=40, height=calc), index i maps to particle i.
+          if (i < configRef.current.particleCount && pIdx < configRef.current.particleCount) {
+            const pArr = particles.geometry.attributes.position.array as Float32Array;
             linePositions.push(
-              positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2],
-              positions[j * 3], positions[j * 3 + 1], positions[j * 3 + 2]
+              pArr[i * 3], pArr[i * 3 + 1], pArr[i * 3 + 2],
+              pArr[pIdx * 3], pArr[pIdx * 3 + 1], pArr[pIdx * 3 + 2]
             );
           }
         }
       }
       linesMesh.geometry.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
-    };
+      return;
+    }
 
-    const onMouseMove = (event: MouseEvent) => {
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    };
+    if (['lorenz', 'quant', 'series', 'topology', 'calculus'].includes(mode)) {
+      linesMesh.visible = false;
+      return;
+    }
 
-    const onWindowResize = () => {
-      if (!camera || !renderer) return;
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    };
+    linesMesh.visible = true;
+    const positions = particles.geometry.attributes.position.array as Float32Array;
+    const linePositions = [];
+    const checkLimit = isMobile ? 15 : 40;
+    const limit = configRef.current.particleCount;
+    const step = isMobile ? 3 : 2;
 
-    const animate = () => {
-      animationId = requestAnimationFrame(animate);
-      const positions = particles.geometry.attributes.position.array as Float32Array;
-      const colors = particles.geometry.attributes.color.array as Float32Array;
-      const time = Date.now() * 0.001;
-      const mode = configRef.current.mode;
+    for (let i = 0; i < limit; i += step) {
+      for (let j = i + 1; j < Math.min(i + checkLimit, limit); j++) {
+        const dx = positions[i * 3] - positions[j * 3];
+        const dy = positions[i * 3 + 1] - positions[j * 3 + 1];
+        const dz = positions[i * 3 + 2] - positions[j * 3 + 2];
+        const distSq = dx * dx + dy * dy + dz * dz;
 
-      camera.position.x += (mouse.x * 3 - camera.position.x) * 0.05;
-      camera.position.y += (mouse.y * 3 + 10 - camera.position.y) * 0.05;
-      camera.lookAt(scene.position);
+        let threshold = 12;
+        if (mode === 'neural') threshold = 30;
+        if (mode === 'nash') threshold = 8;
+        if (mode === 'matrix') threshold = 14;
 
-      // Rotation
-      if (['lorenz', 'nash', 'orbit'].includes(mode)) {
-        particles.rotation.y = time * 0.1; linesMesh.rotation.y = time * 0.1;
-      } else {
-        particles.rotation.y = 0; linesMesh.rotation.y = 0;
+        if (distSq < threshold) {
+          linePositions.push(
+            positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2],
+            positions[j * 3], positions[j * 3 + 1], positions[j * 3 + 2]
+          );
+        }
+      }
+    }
+    linesMesh.geometry.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+  };
+
+  const onMouseMove = (event: MouseEvent) => {
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  };
+
+  const onWindowResize = () => {
+    if (!camera || !renderer) return;
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  };
+
+  const animate = () => {
+    animationId = requestAnimationFrame(animate);
+    const positions = particles.geometry.attributes.position.array as Float32Array;
+    const colors = particles.geometry.attributes.color.array as Float32Array;
+    const time = Date.now() * 0.001;
+    const mode = configRef.current.mode;
+
+    camera.position.x += (mouse.x * 3 - camera.position.x) * 0.05;
+    camera.position.y += (mouse.y * 3 + 10 - camera.position.y) * 0.05;
+    camera.lookAt(scene.position);
+
+    // Rotation
+    if (['lorenz', 'nash', 'orbit'].includes(mode)) {
+      particles.rotation.y = time * 0.1; linesMesh.rotation.y = time * 0.1;
+    } else {
+      particles.rotation.y = 0; linesMesh.rotation.y = 0;
+    }
+
+    // Neural Pulse
+    if (mode === 'neural') {
+      const waveSpeed = 4;
+      const wavePos = ((time * waveSpeed) % 40) - 20;
+      for (let i = 0; i < configRef.current.particleCount; i++) {
+        const i3 = i * 3;
+        const x = positions[i3];
+        const dist = Math.abs(x - wavePos);
+        const glow = Math.exp(- (dist * dist) / 10);
+        colors[i3] = 0.83 + (0.17 * glow);
+        colors[i3 + 1] = 0.68 + (0.32 * glow);
+        colors[i3 + 2] = 0.21 + (0.79 * glow);
+      }
+      particles.geometry.attributes.color.needsUpdate = true;
+    }
+
+    // Universal Rotation Reset & Logic
+    // Default: Reset all to 0 first
+
+    // --- ALGORITHM VISUALIZATION LOGIC ---
+    if (['astar', 'dijkstra', 'bfs', 'dfs'].includes(mode)) {
+      // Initialize Grid if needed
+      if (!algoRunnerRef.current.grid) {
+        const width = 40;
+        const height = Math.floor(configRef.current.particleCount / width);
+        const grid = new PathfindingGrid(width, height, 0.25); // 25% obstacles
+
+        // Set start/end
+        const start = { x: 5, y: Math.floor(height / 2) };
+        const end = { x: width - 5, y: Math.floor(height / 2) };
+
+        // Create Generator
+        let gen: Generator | null = null;
+        if (mode === 'astar') gen = runAStar(grid, start, end);
+        if (mode === 'dijkstra') gen = runDijkstra(grid, start, end);
+        if (mode === 'bfs') gen = runBFS(grid, start, end);
+        if (mode === 'dfs') gen = runDFS(grid, start, end);
+
+        algoRunnerRef.current.grid = grid;
+        algoRunnerRef.current.generator = gen;
+        algoRunnerRef.current.timer = 0;
+
+        // Sync Obstacles to Visuals immediately (optional, or let the loop handle it)
+        // If a node is not walkable, make it dim/invisible? Or red wall?
+        // Let's use color loop below.
       }
 
-      // Neural Pulse
-      if (mode === 'neural') {
-        const waveSpeed = 4;
-        const wavePos = ((time * waveSpeed) % 40) - 20;
-        for (let i = 0; i < configRef.current.particleCount; i++) {
+      // Advance Generator Steps
+      algoRunnerRef.current.timer += 1;
+      if (algoRunnerRef.current.timer % 2 === 0 && algoRunnerRef.current.generator && algoRunnerRef.current.grid) {
+        const res = algoRunnerRef.current.generator.next();
+        // if res.done, we stop animating but keep rendering state
+      }
+
+      // Update Colors based on Grid State
+      const grid = algoRunnerRef.current.grid;
+      if (grid) {
+        for (let i = 0; i < grid.nodes.length && i < configRef.current.particleCount; i++) {
+          const node = grid.nodes[i];
           const i3 = i * 3;
-          const x = positions[i3];
-          const dist = Math.abs(x - wavePos);
-          const glow = Math.exp(- (dist * dist) / 10);
-          colors[i3] = 0.83 + (0.17 * glow);
-          colors[i3 + 1] = 0.68 + (0.32 * glow);
-          colors[i3 + 2] = 0.21 + (0.79 * glow);
+
+          // Default Gold/White
+          if (!node.walkable) {
+            // Wall - Dark Grey
+            colors[i3] = 0.1; colors[i3 + 1] = 0.1; colors[i3 + 2] = 0.1;
+          } else if (node.state === 'path') {
+            // FINAL PATH: Pure Beam White
+            colors[i3] = 1.0; colors[i3 + 1] = 1.0; colors[i3 + 2] = 1.0;
+          } else if (node.state === 'closed') {
+            // TRAIL (Visited): Comet Trail Effect
+            // decay based on how long ago it was closed
+            const currentStep = Math.floor(algoRunnerRef.current.timer / 2);
+            const age = currentStep - (node.closedTick || 0);
+            const decay = Math.max(0, 1 - age * 0.03); // Fade out over ~30 steps
+
+            // Halo Gold (1.0, 0.85, 0.3) fading to Darker Gold (0.4, 0.3, 0.1)
+            colors[i3] = 0.4 + (0.6 * decay);
+            colors[i3 + 1] = 0.3 + (0.55 * decay);
+            colors[i3 + 2] = 0.1 + (0.2 * decay);
+          } else if (node.state === 'open') {
+            // FRONTIER: Hot Spark Orange
+            colors[i3] = 1.0; colors[i3 + 1] = 0.6; colors[i3 + 2] = 0.1;
+          } else {
+            // Unvisited - Faint
+            colors[i3] = 0.2; colors[i3 + 1] = 0.2; colors[i3 + 2] = 0.2;
+          }
         }
         particles.geometry.attributes.color.needsUpdate = true;
       }
 
-      // Universal Rotation Reset & Logic
-      // Default: Reset all to 0 first
-
-      // --- ALGORITHM VISUALIZATION LOGIC ---
-      if (['astar', 'dijkstra', 'bfs', 'dfs'].includes(mode)) {
-        // Initialize Grid if needed
-        if (!algoRunnerRef.current.grid) {
-          const width = 40;
-          const height = Math.floor(configRef.current.particleCount / width);
-          const grid = new PathfindingGrid(width, height, 0.25); // 25% obstacles
-
-          // Set start/end
-          const start = { x: 5, y: Math.floor(height / 2) };
-          const end = { x: width - 5, y: Math.floor(height / 2) };
-
-          // Create Generator
-          let gen: Generator | null = null;
-          if (mode === 'astar') gen = runAStar(grid, start, end);
-          if (mode === 'dijkstra') gen = runDijkstra(grid, start, end);
-          if (mode === 'bfs') gen = runBFS(grid, start, end);
-          if (mode === 'dfs') gen = runDFS(grid, start, end);
-
-          algoRunnerRef.current.grid = grid;
-          algoRunnerRef.current.generator = gen;
-          algoRunnerRef.current.timer = 0;
-
-          // Sync Obstacles to Visuals immediately (optional, or let the loop handle it)
-          // If a node is not walkable, make it dim/invisible? Or red wall?
-          // Let's use color loop below.
+    } else {
+      // Reset Colors check
+      if (configRef.current.needsColorReset && mode !== 'neural') {
+        for (let i = 0; i < configRef.current.particleCount; i++) {
+          const i3 = i * 3;
+          // Random Gold assignment again
+          const isGold = Math.random() > 0.6;
+          const color = isGold ? configRef.current.color : configRef.current.white;
+          colors[i3] = color.r;
+          colors[i3 + 1] = color.g;
+          colors[i3 + 2] = color.b;
         }
-
-        // Advance Generator Steps
-        algoRunnerRef.current.timer += 1;
-        if (algoRunnerRef.current.timer % 2 === 0 && algoRunnerRef.current.generator && algoRunnerRef.current.grid) {
-          const res = algoRunnerRef.current.generator.next();
-          // if res.done, we stop animating but keep rendering state
-        }
-
-        // Update Colors based on Grid State
-        const grid = algoRunnerRef.current.grid;
-        if (grid) {
-          for (let i = 0; i < grid.nodes.length && i < configRef.current.particleCount; i++) {
-            const node = grid.nodes[i];
-            const i3 = i * 3;
-
-            // Default Gold/White
-            if (!node.walkable) {
-              // Wall - Dark Grey
-              colors[i3] = 0.1; colors[i3 + 1] = 0.1; colors[i3 + 2] = 0.1;
-            } else if (node.state === 'path') {
-              // FINAL PATH: Pure Beam White
-              colors[i3] = 1.0; colors[i3 + 1] = 1.0; colors[i3 + 2] = 1.0;
-            } else if (node.state === 'closed') {
-              // TRAIL (Visited): Comet Trail Effect
-              // decay based on how long ago it was closed
-              const currentStep = Math.floor(algoRunnerRef.current.timer / 2);
-              const age = currentStep - (node.closedTick || 0);
-              const decay = Math.max(0, 1 - age * 0.03); // Fade out over ~30 steps
-
-              // Halo Gold (1.0, 0.85, 0.3) fading to Darker Gold (0.4, 0.3, 0.1)
-              colors[i3] = 0.4 + (0.6 * decay);
-              colors[i3 + 1] = 0.3 + (0.55 * decay);
-              colors[i3 + 2] = 0.1 + (0.2 * decay);
-            } else if (node.state === 'open') {
-              // FRONTIER: Hot Spark Orange
-              colors[i3] = 1.0; colors[i3 + 1] = 0.6; colors[i3 + 2] = 0.1;
-            } else {
-              // Unvisited - Faint
-              colors[i3] = 0.2; colors[i3 + 1] = 0.2; colors[i3 + 2] = 0.2;
-            }
-          }
-          particles.geometry.attributes.color.needsUpdate = true;
-        }
-
-      } else {
-        // Reset Colors check
-        if (configRef.current.needsColorReset && mode !== 'neural') {
-          for (let i = 0; i < configRef.current.particleCount; i++) {
-            const i3 = i * 3;
-            // Random Gold assignment again
-            const isGold = Math.random() > 0.6;
-            const color = isGold ? configRef.current.color : configRef.current.white;
-            colors[i3] = color.r;
-            colors[i3 + 1] = color.g;
-            colors[i3 + 2] = color.b;
-          }
-          particles.geometry.attributes.color.needsUpdate = true;
-          configRef.current.needsColorReset = false;
-        }
+        particles.geometry.attributes.color.needsUpdate = true;
+        configRef.current.needsColorReset = false;
       }
+    }
 
 
-      particles.rotation.set(0, 0, 0);
-      linesMesh.rotation.set(0, 0, 0);
+    particles.rotation.set(0, 0, 0);
+    linesMesh.rotation.set(0, 0, 0);
 
-      // Apply specific rotations per mode
-      if (['lorenz', 'nash', 'orbit'].includes(mode)) {
-        particles.rotation.y = time * 0.1;
-        linesMesh.rotation.y = time * 0.1;
+    // Apply specific rotations per mode
+    if (['lorenz', 'nash', 'orbit'].includes(mode)) {
+      particles.rotation.y = time * 0.1;
+      linesMesh.rotation.y = time * 0.1;
+    } else if (mode === 'topology') {
+      particles.rotation.y = time * 0.1;
+      particles.rotation.x = time * 0.1;
+      // No lines for topology
+    } else if (mode === 'calculus') {
+      particles.rotation.z = time * 0.1;
+      // No lines for calculus
+    } else if (mode === 'series') {
+      particles.rotation.y = time * 0.2;
+      // No lines for series
+    }
+
+
+    // Movement
+    for (let i = 0; i < configRef.current.particleCount; i++) {
+      const i3 = i * 3;
+      let tx = 0, ty = 0, tz = 0;
+
+      // Note: In a real refactor, use a map or switch, but maintaining provided logic structure
+      if (mode === 'graph') {
+        tx = targets.graph[i3]; ty = targets.graph[i3 + 1]; tz = targets.graph[i3 + 2];
+      } else if (mode === 'orbit') {
+        tx = targets.orbit[i3]; ty = targets.orbit[i3 + 1] + Math.sin(time * 2 + i) * 1.5; tz = targets.orbit[i3 + 2];
+      } else if (mode === 'matrix') {
+        tx = targets.matrix[i3]; ty = targets.matrix[i3 + 1] + Math.sin(time + tx * 0.3) * 2; tz = targets.matrix[i3 + 2];
+      } else if (mode === 'threebody') {
+        tx = targets.threebody[i3] + Math.sin(time * 2 + i) * 2;
+        ty = targets.threebody[i3 + 1] + Math.cos(time * 1.5 + i) * 2;
+        tz = targets.threebody[i3 + 2] + Math.sin(time + i) * 2;
+      } else if (mode === 'neural') {
+        tx = targets.neural[i3]; ty = targets.neural[i3 + 1]; tz = targets.neural[i3 + 2];
+      } else if (mode === 'quant') {
+        tx = targets.quant[i3]; ty = targets.quant[i3 + 1] + Math.sin(time * 2 + tx * 0.1) * 2; tz = targets.quant[i3 + 2];
+      } else if (mode === 'nash') {
+        tx = targets.nash[i3]; ty = targets.nash[i3 + 1]; tz = targets.nash[i3 + 2];
+      } else if (mode === 'lorenz') {
+        tx = targets.lorenz[i3]; ty = targets.lorenz[i3 + 1]; tz = targets.lorenz[i3 + 2];
+      } else if (mode === 'golden') {
+        tx = targets.golden[i3]; ty = targets.golden[i3 + 1]; tz = targets.golden[i3 + 2];
       } else if (mode === 'topology') {
-        particles.rotation.y = time * 0.1;
-        particles.rotation.x = time * 0.1;
-        // No lines for topology
+        tx = targets.topology[i3]; ty = targets.topology[i3 + 1]; tz = targets.topology[i3 + 2];
       } else if (mode === 'calculus') {
-        particles.rotation.z = time * 0.1;
-        // No lines for calculus
+        tx = targets.calculus[i3]; ty = targets.calculus[i3 + 1]; tz = targets.calculus[i3 + 2];
       } else if (mode === 'series') {
-        particles.rotation.y = time * 0.2;
-        // No lines for series
+        tx = targets.series[i3]; ty = targets.series[i3 + 1]; tz = targets.series[i3 + 2];
+      } else if (['astar', 'dijkstra', 'bfs', 'dfs'].includes(mode)) {
+        // Use algorithm grid positions
+        tx = targets.algorithm[i3];
+        ty = targets.algorithm[i3 + 1];
+        tz = targets.algorithm[i3 + 2];
       }
 
+      positions[i3] += (tx - positions[i3]) * 0.04;
+      positions[i3 + 1] += (ty - positions[i3 + 1]) * 0.04;
+      positions[i3 + 2] += (tz - positions[i3 + 2]) * 0.04;
+    }
 
-      // Movement
-      for (let i = 0; i < configRef.current.particleCount; i++) {
-        const i3 = i * 3;
-        let tx = 0, ty = 0, tz = 0;
+    particles.geometry.attributes.position.needsUpdate = true;
+    updateLines();
+    renderer.render(scene, camera);
+  };
 
-        // Note: In a real refactor, use a map or switch, but maintaining provided logic structure
-        if (mode === 'graph') {
-          tx = targets.graph[i3]; ty = targets.graph[i3 + 1]; tz = targets.graph[i3 + 2];
-        } else if (mode === 'orbit') {
-          tx = targets.orbit[i3]; ty = targets.orbit[i3 + 1] + Math.sin(time * 2 + i) * 1.5; tz = targets.orbit[i3 + 2];
-        } else if (mode === 'matrix') {
-          tx = targets.matrix[i3]; ty = targets.matrix[i3 + 1] + Math.sin(time + tx * 0.3) * 2; tz = targets.matrix[i3 + 2];
-        } else if (mode === 'threebody') {
-          tx = targets.threebody[i3] + Math.sin(time * 2 + i) * 2;
-          ty = targets.threebody[i3 + 1] + Math.cos(time * 1.5 + i) * 2;
-          tz = targets.threebody[i3 + 2] + Math.sin(time + i) * 2;
-        } else if (mode === 'neural') {
-          tx = targets.neural[i3]; ty = targets.neural[i3 + 1]; tz = targets.neural[i3 + 2];
-        } else if (mode === 'quant') {
-          tx = targets.quant[i3]; ty = targets.quant[i3 + 1] + Math.sin(time * 2 + tx * 0.1) * 2; tz = targets.quant[i3 + 2];
-        } else if (mode === 'nash') {
-          tx = targets.nash[i3]; ty = targets.nash[i3 + 1]; tz = targets.nash[i3 + 2];
-        } else if (mode === 'lorenz') {
-          tx = targets.lorenz[i3]; ty = targets.lorenz[i3 + 1]; tz = targets.lorenz[i3 + 2];
-        } else if (mode === 'golden') {
-          tx = targets.golden[i3]; ty = targets.golden[i3 + 1]; tz = targets.golden[i3 + 2];
-        } else if (mode === 'topology') {
-          tx = targets.topology[i3]; ty = targets.topology[i3 + 1]; tz = targets.topology[i3 + 2];
-        } else if (mode === 'calculus') {
-          tx = targets.calculus[i3]; ty = targets.calculus[i3 + 1]; tz = targets.calculus[i3 + 2];
-        } else if (mode === 'series') {
-          tx = targets.series[i3]; ty = targets.series[i3 + 1]; tz = targets.series[i3 + 2];
-        } else if (['astar', 'dijkstra', 'bfs', 'dfs'].includes(mode)) {
-          // Use algorithm grid positions
-          tx = targets.algorithm[i3];
-          ty = targets.algorithm[i3 + 1];
-          tz = targets.algorithm[i3 + 2];
-        }
+  // EXECUTE
+  createParticles();
+  createLines();
+  window.addEventListener('resize', onWindowResize);
+  document.addEventListener('mousemove', onMouseMove);
+  animate();
 
-        positions[i3] += (tx - positions[i3]) * 0.04;
-        positions[i3 + 1] += (ty - positions[i3 + 1]) * 0.04;
-        positions[i3 + 2] += (tz - positions[i3 + 2]) * 0.04;
-      }
+  return () => {
+    window.removeEventListener('resize', onWindowResize);
+    document.removeEventListener('mousemove', onMouseMove);
+    if (containerRef.current && renderer) {
+      containerRef.current.removeChild(renderer.domElement);
+    }
+    cancelAnimationFrame(animationId);
+  };
+}, []);
 
-      particles.geometry.attributes.position.needsUpdate = true;
-      updateLines();
-      renderer.render(scene, camera);
-    };
+return (
+  <>
+    <div ref={containerRef} id="canvas-container" className="fixed top-0 left-0 w-full h-full -z-10 bg-math-black" />
 
-    // EXECUTE
-    createParticles();
-    createLines();
-    window.addEventListener('resize', onWindowResize);
-    document.addEventListener('mousemove', onMouseMove);
-    animate();
-
-    return () => {
-      window.removeEventListener('resize', onWindowResize);
-      document.removeEventListener('mousemove', onMouseMove);
-      if (containerRef.current && renderer) {
-        containerRef.current.removeChild(renderer.domElement);
-      }
-      cancelAnimationFrame(animationId);
-    };
-  }, []);
-
-  return (
-    <>
-      <div ref={containerRef} id="canvas-container" className="fixed top-0 left-0 w-full h-full -z-10 bg-math-black" />
-
-      {/* Navigation */}
-      <nav className="fixed w-full z-50 top-0 left-0 border-b border-white/10 bg-math-black/80 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20">
-            <div className="flex items-center gap-3">
-              {/* Logo Image with Blend Mode to remove white background */}
-              <div className="w-10 h-10 relative overflow-hidden rounded-full mr-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/ttc-logo.png"
-                  alt="The Turing Circle"
-                  className="w-full h-full object-cover mix-blend-screen scale-110"
-                />
-              </div>
-              <span className="font-serif text-2xl font-bold tracking-wide text-white">THE TURING CIRCLE</span>
+    {/* Navigation */}
+    <nav className="fixed w-full z-50 top-0 left-0 border-b border-white/10 bg-math-black/80 backdrop-blur-md">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-20">
+          <div className="flex items-center gap-3">
+            {/* Logo Image with Blend Mode to remove white background */}
+            <div className="w-10 h-10 relative overflow-hidden rounded-full mr-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/ttc-logo.png"
+                alt="The Turing Circle"
+                className="w-full h-full object-cover mix-blend-screen scale-110"
+              />
             </div>
-            <div className="flex items-center gap-4">
-              {/* Mobile: Join Club Button Visible */}
-              <a href="https://theturingcircle.vercel.app/" target="_blank" className="md:hidden btn-gold px-3 py-1.5 text-xs rounded-sm uppercase">Join</a>
+            <span className="font-serif text-2xl font-bold tracking-wide text-white">THE TURING CIRCLE</span>
+          </div>
+          <div className="flex items-center gap-4">
+            {/* Mobile: Join Club Button Visible */}
+            <a href="https://theturingcircle.vercel.app/" target="_blank" className="md:hidden btn-gold px-3 py-1.5 text-xs rounded-sm uppercase">Join</a>
 
-              <div className="hidden md:block">
-                <div className="ml-10 flex items-baseline space-x-8 text-sm font-medium tracking-widest uppercase">
-                  <a href="#home" className="nav-link text-white hover:text-math-gold px-3 py-2 transition-colors">Home</a>
-                  <a href="#manifesto" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Manifesto</a>
-                  <a href="#research" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Foundations</a>
-                  <a href="#domains" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Domains</a>
-                  <a href="https://theturingcircle.vercel.app/" target="_blank" className="btn-gold px-4 py-2 rounded-sm uppercase">Join Club</a>
-                </div>
+            <div className="hidden md:block">
+              <div className="ml-10 flex items-baseline space-x-8 text-sm font-medium tracking-widest uppercase">
+                <a href="#home" className="nav-link text-white hover:text-math-gold px-3 py-2 transition-colors">Home</a>
+                <a href="#manifesto" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Manifesto</a>
+                <a href="#research" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Foundations</a>
+                <a href="#domains" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Domains</a>
+                <a href="https://theturingcircle.vercel.app/" target="_blank" className="btn-gold px-4 py-2 rounded-sm uppercase">Join Club</a>
               </div>
             </div>
           </div>
         </div>
-      </nav>
+      </div>
+    </nav>
 
-      {/* Insight Overlay */}
-      <div className="fixed bottom-24 left-4 right-4 z-40 md:right-8 md:bottom-24 md:w-auto md:left-auto md:max-w-sm">
-        <motion.div
-          className="glass-panel p-4 md:p-6 border-l-2 border-l-math-gold bg-black/20 backdrop-blur-md cursor-pointer"
-          onClick={() => setIsOverlayMinimized(!isOverlayMinimized)}
-          animate={{
-            opacity: isUpdatingInsight ? 0 : (isOverlayMinimized ? 0.6 : 1),
-            y: isUpdatingInsight ? 10 : (isOverlayMinimized ? 120 : 0),
-            scale: isOverlayMinimized ? 0.9 : 1
-          }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        >
-          <h4 className="text-math-gold font-serif text-lg italic mb-2">{insight.title}</h4>
-          <p className="text-xs text-gray-300 leading-relaxed">{insight.text}</p>
-          <div className="mt-3 flex gap-2 items-center">
-            <div className="w-2 h-2 rounded-full bg-math-gold animate-pulse"></div>
-            <span className="text-[10px] uppercase tracking-widest text-white/50">Live Render</span>
-          </div>
-        </motion.div>
+    {/* Insight Overlay */}
+    <div className="fixed bottom-24 left-4 right-4 z-40 md:right-8 md:bottom-24 md:w-auto md:left-auto md:max-w-sm">
+      <motion.div
+        className="glass-panel p-4 md:p-6 border-l-2 border-l-math-gold bg-black/20 backdrop-blur-md cursor-pointer"
+        onClick={() => setIsOverlayMinimized(!isOverlayMinimized)}
+        animate={{
+          opacity: isUpdatingInsight ? 0 : (isOverlayMinimized ? 0.6 : 1),
+          y: isUpdatingInsight ? 10 : (isOverlayMinimized ? 120 : 0),
+          scale: isOverlayMinimized ? 0.9 : 1
+        }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      >
+        <h4 className="text-math-gold font-serif text-lg italic mb-2">{insight.title}</h4>
+        <p className="text-xs text-gray-300 leading-relaxed">{insight.text}</p>
+        <div className="mt-3 flex gap-2 items-center">
+          <div className="w-2 h-2 rounded-full bg-math-gold animate-pulse"></div>
+          <span className="text-[10px] uppercase tracking-widest text-white/50">Live Render</span>
+        </div>
+      </motion.div>
+    </div>
+
+    <main className="relative z-10 pt-20">
+
+      {/* Helper Comps for Console Buttons */}
+      <div className="hidden">
+        {/* Tailwind Classes Generator for dynamically used colors since we can't rely on JIT fully in pure string interpolation sometimes without safelist, but here we use standard classes */}
       </div>
 
-      <main className="relative z-10 pt-20">
+      {/* Hero Section */}
+      <section id="home" className="min-h-screen flex items-center justify-center relative">
+        <div className="text-center px-4 max-w-6xl mx-auto">
+          <motion.p
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1 }}
+            className="font-sans text-math-gold tracking-[0.3em] uppercase text-xs md:text-sm mb-4"
+          >
+            The Language of the Universe
+          </motion.p>
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.2 }}
+            className="font-serif text-5xl md:text-7xl lg:text-8xl font-thin leading-tight mb-8"
+          >
+            The Geometry of <br />
+            <span className="italic text-math-gold-light">Thought</span>
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.4 }}
+            className="text-white/60 text-lg md:text-xl font-light mb-12 max-w-2xl mx-auto"
+          >
+            Visualizing the invisible structures that govern reality.
+          </motion.p>
 
-        {/* Helper Comps for Console Buttons */}
-        <div className="hidden">
-          {/* Tailwind Classes Generator for dynamically used colors since we can't rely on JIT fully in pure string interpolation sometimes without safelist, but here we use standard classes */}
-        </div>
-
-        {/* Hero Section */}
-        <section id="home" className="min-h-screen flex items-center justify-center relative">
-          <div className="text-center px-4 max-w-6xl mx-auto">
-            <motion.p
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1 }}
-              className="font-sans text-math-gold tracking-[0.3em] uppercase text-xs md:text-sm mb-4"
-            >
-              The Language of the Universe
-            </motion.p>
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.2 }}
-              className="font-serif text-5xl md:text-7xl lg:text-8xl font-thin leading-tight mb-8"
-            >
-              The Geometry of <br />
-              <span className="italic text-math-gold-light">Thought</span>
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.4 }}
-              className="text-white/60 text-lg md:text-xl font-light mb-12 max-w-2xl mx-auto"
-            >
-              Visualizing the invisible structures that govern reality.
-            </motion.p>
-
-            {/* Foundation Controls */}
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 0.6 }}
-              className="inline-block"
-            >
-              <div className="flex flex-wrap gap-4 justify-center items-center">
-                {['graph', 'orbit', 'matrix', 'threebody', 'lorenz'].map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => changeVizMode(m)}
-                    className={`relative bg-black/40 border px-5 py-3 font-sans text-xs uppercase tracking-widest transition-all duration-300 w-32 flex items-center justify-center gap-2 overflow-hidden
+          {/* Foundation Controls */}
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 0.6 }}
+            className="inline-block"
+          >
+            <div className="flex flex-wrap gap-4 justify-center items-center">
+              {['graph', 'orbit', 'matrix', 'threebody', 'lorenz'].map((m) => (
+                <button
+                  key={m}
+                  onClick={() => changeVizMode(m)}
+                  className={`relative bg-black/40 border px-5 py-3 font-sans text-xs uppercase tracking-widest transition-all duration-300 w-32 flex items-center justify-center gap-2 overflow-hidden
                                     ${vizMode === m ? 'border-math-gold text-white bg-math-gold/10' : 'border-white/15 text-white/70 hover:border-math-gold hover:text-white'}
                                 `}
-                  >
-                    <span className={`absolute left-0 top-0 w-0.5 h-full bg-math-gold transition-transform duration-300 ${vizMode === m ? 'scale-y-100' : 'scale-y-0'}`}></span>
-                    {m === 'threebody' ? '3-Body' : m === 'lorenz' ? 'Chaos' : m}
-                  </button>
-                ))}
-              </div>
-              <p className="mt-4 text-[10px] uppercase tracking-widest text-white/30">Foundations Console</p>
-            </motion.div>
-          </div>
-        </section>
-
-        {/* Manifesto */}
-        <section id="manifesto" className="py-24 relative">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
-              <div>
-                <h2 className="font-serif text-4xl text-math-gold mb-6">The Map of Mathematics</h2>
-                <div className="w-16 h-1 bg-math-gold mb-8"></div>
-                <p className="text-gray-300 font-light leading-relaxed mb-6">
-                  Mathematics is not just equations; it&apos;s a vast landscape of interconnected ideas. Inspired by Quanta Magazine&apos;s visualizations, we aim to map these territories.
-                </p>
-                <p className="text-gray-300 font-light leading-relaxed">
-                  From the rigid structures of <strong className="text-white">Algebra</strong> to the fluid deformations of <strong className="text-white">Topology</strong>, we explore the nexus where these fields meet art and technology.
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { symbol: 'φ', label: 'Golden Ratio', mode: 'golden' },
-                  { symbol: 'τ', label: 'Topology', mode: 'topology' },
-                  { symbol: '∫', label: 'Calculus', mode: 'calculus' },
-                  { symbol: 'Σ', label: 'Series', mode: 'series' }
-                ].map((item, i) => (
-                  <button
-                    key={i}
-                    onClick={() => changeVizMode(item.mode)}
-                    className="glass-panel p-6 text-center border border-math-gold/20 bg-black/20 backdrop-blur-sm hover:border-math-gold transition-colors w-full"
-                  >
-                    <div className="text-3xl font-serif text-math-gold mb-2">{item.symbol}</div>
-                    <div className="text-xs uppercase tracking-widest text-white/60">{item.label}</div>
-                  </button>
-                ))}
-              </div>
+                >
+                  <span className={`absolute left-0 top-0 w-0.5 h-full bg-math-gold transition-transform duration-300 ${vizMode === m ? 'scale-y-100' : 'scale-y-0'}`}></span>
+                  {m === 'threebody' ? '3-Body' : m === 'lorenz' ? 'Chaos' : m}
+                </button>
+              ))}
             </div>
-          </div>
-        </section>
+            <p className="mt-4 text-[10px] uppercase tracking-widest text-white/30">Foundations Console</p>
+          </motion.div>
+        </div>
+      </section>
 
-        {/* Research (Foundations Cards) */}
-        <section id="research" className="py-24 bg-transparent">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 className="font-serif text-4xl text-white mb-4">Algorithms and Tinkerings</h2>
-              <p className="text-white/50 font-mono text-sm">/root/simulations/foundations</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {/* A* Search */}
-              <div className="glass-panel p-8 group cursor-pointer border border-white/10 hover:border-math-gold/50 bg-black/20 transition-all" onClick={() => changeVizMode('astar')}>
-                <div className="h-24 mb-6 border border-white/10 bg-black/10 relative overflow-hidden flex items-center justify-center">
-                  <span className="text-4xl text-math-gold font-serif">A*</span>
-                </div>
-                <h3 className="text-lg font-serif text-white mb-2 group-hover:text-math-gold transition-colors">A* Search</h3>
-              </div>
-
-              {/* Dijkstra */}
-              <div className="glass-panel p-8 group cursor-pointer border border-white/10 hover:border-math-gold/50 bg-black/20 transition-all" onClick={() => changeVizMode('dijkstra')}>
-                <div className="h-24 mb-6 border border-white/10 bg-black/10 relative overflow-hidden flex items-center justify-center">
-                  <div className="w-12 h-12 border-2 border-white/30 rounded-full flex items-center justify-center">
-                    <div className="w-8 h-8 bg-math-gold/20 rounded-full"></div>
-                  </div>
-                </div>
-                <h3 className="text-lg font-serif text-white mb-2 group-hover:text-math-gold transition-colors">Dijkstra's Algo</h3>
-              </div>
-
-              {/* BFS */}
-              <div className="glass-panel p-8 group cursor-pointer border border-white/10 hover:border-math-gold/50 bg-black/20 transition-all" onClick={() => changeVizMode('bfs')}>
-                <div className="h-24 mb-6 border border-white/10 bg-black/10 relative overflow-hidden flex items-center justify-center">
-                  <div className="flex gap-1 justify-center items-end h-16 w-20">
-                    {[1, 2, 3, 4, 3, 2, 1].map((h, i) => (
-                      <div key={i} style={{ height: h * 20 + '%' }} className="w-2 bg-white/50 group-hover:bg-math-gold transition-colors"></div>
-                    ))}
-                  </div>
-                </div>
-                <h3 className="text-lg font-serif text-white mb-2 group-hover:text-math-gold transition-colors">Breadth-First</h3>
-              </div>
-
-              {/* DFS */}
-              <div className="glass-panel p-8 group cursor-pointer border border-white/10 hover:border-math-gold/50 bg-black/20 transition-all" onClick={() => changeVizMode('dfs')}>
-                <div className="h-24 mb-6 border border-white/10 bg-black/10 relative overflow-hidden flex items-center justify-center">
-                  <div className="w-20 h-20 border-l border-b border-math-gold/50 relative">
-                    <div className="absolute bottom-0 left-0 w-2 h-2 bg-white"></div>
-                    <div className="absolute top-0 right-0 w-2 h-2 bg-white"></div>
-                    <div className="absolute bottom-2 left-2 w-16 h-16 border-l border-b border-white/20"></div>
-                  </div>
-                </div>
-                <h3 className="text-lg font-serif text-white mb-2 group-hover:text-math-gold transition-colors">Depth-First</h3>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Domains Console */}
-        <section id="domains" className="py-32 relative">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mb-12">
-              <span className="text-math-gold font-mono text-xs uppercase tracking-widest block mb-2">Applied Mathematics</span>
-              <h2 className="font-serif text-5xl text-white mb-6">The Domain Console</h2>
-              <p className="text-gray-400 max-w-2xl font-light text-lg">
-                Where abstract theory meets high-stakes application. Toggle the modules below to visualize our specific domains of study.
+      {/* Manifesto */}
+      <section id="manifesto" className="py-24 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+            <div>
+              <h2 className="font-serif text-4xl text-math-gold mb-6">The Map of Mathematics</h2>
+              <div className="w-16 h-1 bg-math-gold mb-8"></div>
+              <p className="text-gray-300 font-light leading-relaxed mb-6">
+                Mathematics is not just equations; it&apos;s a vast landscape of interconnected ideas. Inspired by Quanta Magazine&apos;s visualizations, we aim to map these territories.
+              </p>
+              <p className="text-gray-300 font-light leading-relaxed">
+                From the rigid structures of <strong className="text-white">Algebra</strong> to the fluid deformations of <strong className="text-white">Topology</strong>, we explore the nexus where these fields meet art and technology.
               </p>
             </div>
-
-            <div className="bg-transparent border-none p-0 rounded-lg">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-1">
-
-                {/* Neural Net */}
-                <button onClick={() => changeVizMode('neural')} className="group relative bg-black/20 hover:bg-black/40 backdrop-blur-sm p-8 text-left transition-all border border-white/10 hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
-                  <div className="flex justify-between items-start z-10 relative">
-                    <span className="text-math-gold text-xl font-serif">I.</span>
-                    <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
-                  </div>
-                  <div className="z-10 relative">
-                    <h3 className="text-white font-bold mb-1 group-hover:text-math-gold transition-colors">Neural Networks</h3>
-                    <p className="text-xs text-gray-500 uppercase tracking-widest">Machine Learning</p>
-                  </div>
-                  <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-math-gold/50 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { symbol: 'φ', label: 'Golden Ratio', mode: 'golden' },
+                { symbol: 'τ', label: 'Topology', mode: 'topology' },
+                { symbol: '∫', label: 'Calculus', mode: 'calculus' },
+                { symbol: 'Σ', label: 'Series', mode: 'series' }
+              ].map((item, i) => (
+                <button
+                  key={i}
+                  onClick={() => changeVizMode(item.mode)}
+                  className="glass-panel p-6 text-center border border-math-gold/20 bg-black/20 backdrop-blur-sm hover:border-math-gold transition-colors w-full"
+                >
+                  <div className="text-3xl font-serif text-math-gold mb-2">{item.symbol}</div>
+                  <div className="text-xs uppercase tracking-widest text-white/60">{item.label}</div>
                 </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
 
-                {/* Quant */}
-                <button onClick={() => changeVizMode('quant')} className="group relative bg-black/20 hover:bg-black/40 backdrop-blur-sm p-8 text-left transition-all border border-white/10 hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
-                  <div className="flex justify-between items-start z-10 relative">
-                    <span className="text-math-gold text-xl font-serif">II.</span>
-                    <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
-                  </div>
-                  <div className="z-10 relative">
-                    <h3 className="text-white font-bold mb-1 group-hover:text-math-gold transition-colors">Monte Carlo</h3>
-                    <p className="text-xs text-gray-500 uppercase tracking-widest">Quant Finance</p>
-                  </div>
-                  <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-math-gold/50 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
-                </button>
+      {/* Research (Foundations Cards) */}
+      <section id="research" className="py-24 bg-transparent">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="font-serif text-4xl text-white mb-4">Algorithms and Tinkerings</h2>
+            <p className="text-white/50 font-mono text-sm">/root/simulations/foundations</p>
+          </div>
 
-                {/* Nash */}
-                <button onClick={() => changeVizMode('nash')} className="group relative bg-black/20 hover:bg-black/40 backdrop-blur-sm p-8 text-left transition-all border border-white/10 hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
-                  <div className="flex justify-between items-start z-10 relative">
-                    <span className="text-math-gold text-xl font-serif">III.</span>
-                    <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]"></div>
-                  </div>
-                  <div className="z-10 relative">
-                    <h3 className="text-white font-bold mb-1 group-hover:text-math-gold transition-colors">Nash Equilibrium</h3>
-                    <p className="text-xs text-gray-500 uppercase tracking-widest">Game Theory</p>
-                  </div>
-                  <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-math-gold/50 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
-                </button>
-
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {/* A* Search */}
+            <div className="glass-panel p-8 group cursor-pointer border border-white/10 hover:border-math-gold/50 bg-black/20 transition-all" onClick={() => changeVizMode('astar')}>
+              <div className="h-24 mb-6 border border-white/10 bg-black/10 relative overflow-hidden flex items-center justify-center">
+                <span className="text-4xl text-math-gold font-serif">A*</span>
               </div>
+              <h3 className="text-lg font-serif text-white mb-2 group-hover:text-math-gold transition-colors">A* Search</h3>
+            </div>
+
+            {/* Dijkstra */}
+            <div className="glass-panel p-8 group cursor-pointer border border-white/10 hover:border-math-gold/50 bg-black/20 transition-all" onClick={() => changeVizMode('dijkstra')}>
+              <div className="h-24 mb-6 border border-white/10 bg-black/10 relative overflow-hidden flex items-center justify-center">
+                <div className="w-12 h-12 border-2 border-white/30 rounded-full flex items-center justify-center">
+                  <div className="w-8 h-8 bg-math-gold/20 rounded-full"></div>
+                </div>
+              </div>
+              <h3 className="text-lg font-serif text-white mb-2 group-hover:text-math-gold transition-colors">Dijkstra's Algo</h3>
+            </div>
+
+            {/* BFS */}
+            <div className="glass-panel p-8 group cursor-pointer border border-white/10 hover:border-math-gold/50 bg-black/20 transition-all" onClick={() => changeVizMode('bfs')}>
+              <div className="h-24 mb-6 border border-white/10 bg-black/10 relative overflow-hidden flex items-center justify-center">
+                <div className="flex gap-1 justify-center items-end h-16 w-20">
+                  {[1, 2, 3, 4, 3, 2, 1].map((h, i) => (
+                    <div key={i} style={{ height: h * 20 + '%' }} className="w-2 bg-white/50 group-hover:bg-math-gold transition-colors"></div>
+                  ))}
+                </div>
+              </div>
+              <h3 className="text-lg font-serif text-white mb-2 group-hover:text-math-gold transition-colors">Breadth-First</h3>
+            </div>
+
+            {/* DFS */}
+            <div className="glass-panel p-8 group cursor-pointer border border-white/10 hover:border-math-gold/50 bg-black/20 transition-all" onClick={() => changeVizMode('dfs')}>
+              <div className="h-24 mb-6 border border-white/10 bg-black/10 relative overflow-hidden flex items-center justify-center">
+                <div className="w-20 h-20 border-l border-b border-math-gold/50 relative">
+                  <div className="absolute bottom-0 left-0 w-2 h-2 bg-white"></div>
+                  <div className="absolute top-0 right-0 w-2 h-2 bg-white"></div>
+                  <div className="absolute bottom-2 left-2 w-16 h-16 border-l border-b border-white/20"></div>
+                </div>
+              </div>
+              <h3 className="text-lg font-serif text-white mb-2 group-hover:text-math-gold transition-colors">Depth-First</h3>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Footer */}
-        <footer className="border-t border-white/10 bg-black py-12 mt-12 text-center md:text-left">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center">
-            <div className="mb-4 md:mb-0">
-              <span className="font-serif text-2xl font-bold text-white">THE TURING CIRCLE</span>
-              <p className="text-white/40 text-xs mt-1">Est. 2025</p>
-            </div>
-            <div className="flex space-x-6">
-              <a href="https://github.com/Circle-Turing" target="_blank" className="text-white/40 hover:text-math-gold text-sm">GitHub</a>
+      {/* Domains Console */}
+      <section id="domains" className="py-32 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-12">
+            <span className="text-math-gold font-mono text-xs uppercase tracking-widest block mb-2">Applied Mathematics</span>
+            <h2 className="font-serif text-5xl text-white mb-6">The Domain Console</h2>
+            <p className="text-gray-400 max-w-2xl font-light text-lg">
+              Where abstract theory meets high-stakes application. Toggle the modules below to visualize our specific domains of study.
+            </p>
+          </div>
+
+          <div className="bg-transparent border-none p-0 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-1">
+
+              {/* Neural Net */}
+              <button onClick={() => changeVizMode('neural')} className="group relative bg-black/20 hover:bg-black/40 backdrop-blur-sm p-8 text-left transition-all border border-white/10 hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
+                <div className="flex justify-between items-start z-10 relative">
+                  <span className="text-math-gold text-xl font-serif">I.</span>
+                  <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
+                </div>
+                <div className="z-10 relative">
+                  <h3 className="text-white font-bold mb-1 group-hover:text-math-gold transition-colors">Neural Networks</h3>
+                  <p className="text-xs text-gray-500 uppercase tracking-widest">Machine Learning</p>
+                </div>
+                <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-math-gold/50 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
+              </button>
+
+              {/* Quant */}
+              <button onClick={() => changeVizMode('quant')} className="group relative bg-black/20 hover:bg-black/40 backdrop-blur-sm p-8 text-left transition-all border border-white/10 hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
+                <div className="flex justify-between items-start z-10 relative">
+                  <span className="text-math-gold text-xl font-serif">II.</span>
+                  <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
+                </div>
+                <div className="z-10 relative">
+                  <h3 className="text-white font-bold mb-1 group-hover:text-math-gold transition-colors">Monte Carlo</h3>
+                  <p className="text-xs text-gray-500 uppercase tracking-widest">Quant Finance</p>
+                </div>
+                <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-math-gold/50 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
+              </button>
+
+              {/* Nash */}
+              <button onClick={() => changeVizMode('nash')} className="group relative bg-black/20 hover:bg-black/40 backdrop-blur-sm p-8 text-left transition-all border border-white/10 hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
+                <div className="flex justify-between items-start z-10 relative">
+                  <span className="text-math-gold text-xl font-serif">III.</span>
+                  <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]"></div>
+                </div>
+                <div className="z-10 relative">
+                  <h3 className="text-white font-bold mb-1 group-hover:text-math-gold transition-colors">Nash Equilibrium</h3>
+                  <p className="text-xs text-gray-500 uppercase tracking-widest">Game Theory</p>
+                </div>
+                <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-math-gold/50 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
+              </button>
+
             </div>
           </div>
-        </footer>
+        </div>
+      </section>
 
-      </main>
-    </>
-  );
+      {/* Footer */}
+      <footer className="border-t border-white/10 bg-black py-12 mt-12 text-center md:text-left">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center">
+          <div className="mb-4 md:mb-0">
+            <span className="font-serif text-2xl font-bold text-white">THE TURING CIRCLE</span>
+            <p className="text-white/40 text-xs mt-1">Est. 2025</p>
+          </div>
+          <div className="flex space-x-6">
+            <a href="https://github.com/Circle-Turing" target="_blank" className="text-white/40 hover:text-math-gold text-sm">GitHub</a>
+          </div>
+        </div>
+      </footer>
+
+    </main>
+  </>
+);
 }
