@@ -314,8 +314,9 @@ export default function Home() {
       const sprite = new THREE.TextureLoader().load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/sprites/disc.png');
 
       const particleMaterial = new THREE.PointsMaterial({
-        size: 0.25, vertexColors: true, map: sprite, alphaTest: 0.5,
-        transparent: true, opacity: 0.85, sizeAttenuation: true
+        size: 0.6, vertexColors: true, map: sprite, alphaTest: 0.01,
+        transparent: true, opacity: 0.9, sizeAttenuation: true,
+        blending: THREE.AdditiveBlending
       });
 
       particles = new THREE.Points(particleGeometry, particleMaterial);
