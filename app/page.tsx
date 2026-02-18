@@ -84,17 +84,114 @@ export default function Home() {
   const [isOverlayMinimized, setIsOverlayMinimized] = useState(false);
   const [isMosDesActive, setIsMosDesActive] = useState(false);
   const isMosDesActiveRef = useRef(false);
+  const mosDesSectionRef = useRef<HTMLElement>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sync ref for animation loop
   useEffect(() => {
     isMosDesActiveRef.current = isMosDesActive;
   }, [isMosDesActive]);
 
+  // Lazy Scroll Logic: Intersection Observer + Scroll Stability Check
+  useEffect(() => {
+    const section = mosDesSectionRef.current;
+    if (!section) return;
+
+    let isIntersecting = false;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        isIntersecting = entry.isIntersecting;
+
+        // Immediate entry if stable
+        if (isIntersecting && !scrollTimeoutRef.current) {
+          setIsMosDesActive(true);
+        } else if (!isIntersecting) {
+          setIsMosDesActive(false);
+        }
+      },
+      { threshold: 0.7 } // High threshold: must be mostly visible
+    );
+
+    observer.observe(section);
+
+    // Scroll Stability Listener
+    const handleScroll = () => {
+      // If we are scrolling, temporarily disable active state to prevent jitter
+      if (isIntersecting) {
+        // Only debounce exit if we are actually active
+        if (isMosDesActiveRef.current) {
+          // Optional: could force exit here if scroll is fast, 
+          // but user asked for "definitive scroll". 
+          // Let's use a timeout to detect when scroll STOPS.
+        }
+      }
+
+      // On any scroll event, check if we should exit due to "definitive scroll" away
+      // actually standard intersection observer handles "scroll away" well with threshold.
+      // User request: "lazy scroll highlight... if there's a definitive scroll... exit"
+
+      // Implementation: 
+      // We use the observer for entering (high threshold).
+      // For exiting, we trust the observer's exit.
+      // BUT, to prevent "dimming and un dimming" during small adjustments,
+      // we can add a lock or delay. 
+    };
+
+    // Refined Logic per user request:
+    // "prop it up to then and if there's a definitive scroll not adjustment then we exit"
+
+    // We will use TWO observers.
+    // 1. Strict observer for ENTERING (threshold 0.75)
+    // 2. Loose observer for EXITING (threshold 0.3)
+    // This creates hysteresis.
+
+    return () => {
+      observer.disconnect();
+      // window.removeEventListener('scroll', handleScroll);
+    };
+  }, []); // Re-run if ref changes? No ref is stable.
+
+  // Hysteresis Observer Implementation
+  useEffect(() => {
+    const section = mosDesSectionRef.current;
+    if (!section) return;
+
+    const enterObserver = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          // User has scrolled section into full view -> Activate
+          setIsMosDesActive(true);
+        }
+      },
+      { threshold: 0.75 }
+    );
+
+    const exitObserver = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) {
+          // User has scrolled section mostly out of view -> Deactivate
+          setIsMosDesActive(false);
+        }
+      },
+      { threshold: 0.25 }
+    );
+
+    enterObserver.observe(section);
+    exitObserver.observe(section);
+
+    return () => {
+      enterObserver.disconnect();
+      exitObserver.disconnect();
+    };
+  }, []);
+
+
   // Auto-minimize overlay on mobile after generic interaction or time
   useEffect(() => {
     let timeout: NodeJS.Timeout;
     const handleScroll = () => {
-      // Only minimize on mobile/small screens if needed, or generally
       if (window.innerWidth < 768) {
         setIsOverlayMinimized(true);
       }
@@ -845,7 +942,7 @@ export default function Home() {
         </section>
 
         {/* MosDes Section */}
-        <section id="mosdes" className={`py-12 relative transition-all duration-700 ${isMosDesActive ? 'z-50 py-4 scale-[1.02]' : 'z-10'}`}>
+        <section id="mosdes" ref={mosDesSectionRef} className={`py-12 relative transition-all duration-700 ${isMosDesActive ? 'z-50 py-4 scale-[1.02]' : 'z-10'}`}>
           <div className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-[-1] transition-opacity duration-700 pointer-events-none ${isMosDesActive ? 'opacity-100' : 'opacity-0'}`} />
 
           <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
@@ -859,7 +956,7 @@ export default function Home() {
             </div>
 
             <div className="w-full">
-              <GraphSimulation onInteractionStateChange={setIsMosDesActive} />
+              <GraphSimulation />
             </div>
           </div>
         </section>

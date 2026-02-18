@@ -19,6 +19,7 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
     const [equation, setEquation] = useState('sin(x + t) * cos(y)');
     const [errorVal, setError] = useState('');
     const [isRotating, setIsRotating] = useState(false);
+    const [viewMode, setViewMode] = useState<'particles' | 'vectors'>('particles');
 
     // Refs to keep track of Three.js objects across renders
     const sceneRef = useRef<THREE.Scene | null>(null);
@@ -26,6 +27,7 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
     const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
     const controlsRef = useRef<OrbitControls | null>(null);
     const particlesRef = useRef<THREE.Points | null>(null);
+    const arrowsMeshRef = useRef<THREE.InstancedMesh | null>(null);
     const animationIdRef = useRef<number | null>(null);
 
     // Logic Refs
@@ -246,6 +248,18 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
         scene.add(particles);
         particlesRef.current = particles;
 
+        // VECTOR SYSTEM (InstancedMesh)
+        // Reduce count for arrows to avoid performance hit (e.g., 1/6th)
+        const VECTOR_COUNT = Math.floor(PARTICLE_COUNT / 6);
+        const coneGeom = new THREE.ConeGeometry(0.1, 0.4, 6);
+        coneGeom.rotateX(Math.PI / 2); // Point along Z (which we'll orient to normal)
+        const coneMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const arrowMesh = new THREE.InstancedMesh(coneGeom, coneMat, VECTOR_COUNT);
+        arrowMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        arrowMesh.visible = false;
+        scene.add(arrowMesh);
+        arrowsMeshRef.current = arrowMesh;
+
         // Resize Handler
         const handleResize = () => {
             if (!containerRef.current || !cameraRef.current || !rendererRef.current) return;
@@ -268,9 +282,15 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
             if (controlsRef.current) controlsRef.current.update();
 
             const pSys = particlesRef.current;
+            const aSys = arrowsMeshRef.current;
+
             if (pSys) {
                 const posAttr = pSys.geometry.attributes.position;
                 const colAttr = pSys.geometry.attributes.color;
+
+                // Re-render switch logic
+                pSys.visible = viewMode === 'particles';
+                if (aSys) aSys.visible = viewMode === 'vectors';
 
                 // Transition Logic
                 if (transitionProgressRef.current < 1) {
@@ -334,6 +354,49 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
                     posAttr.needsUpdate = true;
                     colAttr.needsUpdate = true;
                 }
+
+                // VECTOR UPDATE
+                if (viewMode === 'vectors' && aSys && initialPositionsRef.current) {
+                    const VECTOR_COUNT = aSys.count;
+                    const dummy = new THREE.Object3D();
+                    const initPos = initialPositionsRef.current;
+                    const posArr = posAttr.array;
+                    const delta = 0.1;
+                    const func = currentFunctionRef.current;
+                    const t = timeRef.current;
+
+                    for (let i = 0; i < VECTOR_COUNT; i++) {
+                        const sourceIdx = i * 6;
+                        if (sourceIdx >= PARTICLE_COUNT) break;
+
+                        const x = initPos[sourceIdx * 3];
+                        const y = initPos[sourceIdx * 3 + 2];
+                        const z = posArr[sourceIdx * 3 + 1];
+
+                        let dzdx = 0, dzdy = 0;
+                        if (func) {
+                            try {
+                                const zx = func(x + delta, y, t);
+                                const zy = func(x, y + delta, t);
+                                dzdx = (zx - z) / delta;
+                                dzdy = (zy - z) / delta;
+                            } catch { }
+                        }
+
+                        const normal = new THREE.Vector3(-dzdx, 1, -dzdy).normalize();
+
+                        dummy.position.set(x, z, y);
+                        dummy.lookAt(x + normal.x, z + normal.y, y + normal.z);
+                        dummy.scale.setScalar(0.5);
+
+                        dummy.updateMatrix();
+                        aSys.setMatrixAt(i, dummy.matrix);
+
+                        aSys.setColorAt(i, new THREE.Color().setHSL(0.6 - (1 - normal.y) * 0.5, 1, 0.5));
+                    }
+                    aSys.instanceMatrix.needsUpdate = true;
+                    if (aSys.instanceColor) aSys.instanceColor.needsUpdate = true;
+                }
             }
 
             if (rendererRef.current && sceneRef.current && cameraRef.current) {
@@ -351,7 +414,7 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
             // Dispose geometries/materials ideally
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [viewMode]);
 
     // UI Handlers
     const handleGraph = () => updateGraph(equation);
@@ -379,9 +442,17 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
 
             {/* Floating UI Panel */}
             <div className="absolute top-4 left-4 z-10 w-80 bg-black/80 backdrop-blur-md border border-white/10 rounded-lg p-4 shadow-lg text-xs font-mono">
-                <h3 className="text-math-gold uppercase tracking-[0.2em] border-b border-white/10 pb-2 mb-3 text-sm font-bold">
-                    MosDes <span className="text-white/40 font-thin ml-2">Console</span>
-                </h3>
+                <div className="flex justify-between items-center border-b border-white/10 pb-2 mb-3">
+                    <h3 className="text-math-gold uppercase tracking-[0.2em] text-sm font-bold">
+                        MosDes <span className="text-white/40 font-thin ml-2">Console</span>
+                    </h3>
+                    <button
+                        onClick={() => setViewMode(prev => prev === 'particles' ? 'vectors' : 'particles')}
+                        className={`px-2 py-0.5 rounded text-[10px] uppercase border ${viewMode === 'vectors' ? 'bg-math-gold text-black border-math-gold' : 'border-white/20 text-white/50'}`}
+                    >
+                        {viewMode === 'vectors' ? 'Vectors' : 'Particles'}
+                    </button>
+                </div>
 
                 <div className="mb-4">
                     <label className="block text-white/50 mb-1">z = f(x, y, t)</label>
