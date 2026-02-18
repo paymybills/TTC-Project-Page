@@ -10,7 +10,11 @@ const RANGE = 10;
 const PARTICLE_SIZE = 0.08;
 const TRANSITION_SPEED = 0.02;
 
-export default function GraphSimulation() {
+interface GraphSimulationProps {
+    onInteractionStateChange?: (isActive: boolean) => void;
+}
+
+export default function GraphSimulation({ onInteractionStateChange }: GraphSimulationProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [equation, setEquation] = useState('sin(x + t) * cos(y)');
     const [errorVal, setError] = useState('');
@@ -365,7 +369,11 @@ export default function GraphSimulation() {
     };
 
     return (
-        <div className="relative w-full h-[600px] rounded-xl overflow-hidden border border-white/10 bg-black/50 backdrop-blur-sm shadow-2xl">
+        <div
+            className="relative w-full h-[600px] rounded-xl overflow-hidden border border-white/10 bg-black/50 backdrop-blur-sm shadow-2xl transition-all duration-500"
+            onMouseEnter={() => onInteractionStateChange?.(true)}
+            onMouseLeave={() => onInteractionStateChange?.(false)}
+        >
             {/* Canvas Container */}
             <div ref={containerRef} className="absolute inset-0 z-0" />
 
