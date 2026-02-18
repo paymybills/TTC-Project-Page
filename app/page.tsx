@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PathfindingGrid, runAStar, runDijkstra, runBFS, runDFS } from './algorithms';
+import GraphSimulation from './components/GraphSimulation';
 
 // Visualization descriptions for the Insight Box
 const VIZ_DESCRIPTIONS: Record<string, { title: string; text: string }> = {
@@ -827,6 +828,39 @@ export default function Home() {
                   </div>
                 </div>
                 <h3 className="text-lg font-serif text-white mb-2 group-hover:text-math-gold transition-colors">Depth-First</h3>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* MosDes Section */}
+        <section id="mosdes" className="py-24 relative overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+              <div>
+                <span className="text-math-gold font-mono text-xs uppercase tracking-widest block mb-2">In-House Engine</span>
+                <h2 className="font-serif text-5xl text-white mb-6">MosDes<span className="text-math-gold/50">_ts</span></h2>
+                <p className="text-gray-300 font-light leading-relaxed mb-8 max-w-lg">
+                  Our in-house beautiful particle-based graph viewer. A real-time WebGL simulation environment for visualizing mathematical surfaces and complex functions.
+                </p>
+                <div className="space-y-4 font-mono text-xs text-white/50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1.5 h-1.5 bg-math-gold rounded-full"></div>
+                    <span>60,000 Interactive Particles</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-1.5 h-1.5 bg-math-gold rounded-full"></div>
+                    <span>Real-time Equation Parsing</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-1.5 h-1.5 bg-math-gold rounded-full"></div>
+                    <span>GPU-Accelerated Transitions</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="w-full">
+                <GraphSimulation />
               </div>
             </div>
           </div>
