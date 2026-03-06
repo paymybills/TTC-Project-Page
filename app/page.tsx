@@ -78,8 +78,8 @@ const VIZ_DESCRIPTIONS: Record<string, { title: string; text: string }> = {
 
 export default function Home() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [vizMode, setVizMode] = useState('graph');
-  const [insight, setInsight] = useState(VIZ_DESCRIPTIONS['graph']);
+  const [vizMode, setVizMode] = useState('matrix');
+  const [insight, setInsight] = useState(VIZ_DESCRIPTIONS['matrix']);
   const [isUpdatingInsight, setIsUpdatingInsight] = useState(false);
   const [isOverlayMinimized, setIsOverlayMinimized] = useState(false);
   const [isMosDesActive, setIsMosDesActive] = useState(false);
@@ -216,7 +216,7 @@ export default function Home() {
     baseSpeed: 0.002,
     color: new THREE.Color(0xD4AF37),
     white: new THREE.Color(0xFFFFFF),
-    mode: 'graph',
+    mode: 'matrix',
     needsColorReset: false
   });
 
