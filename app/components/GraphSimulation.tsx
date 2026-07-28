@@ -21,6 +21,7 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
     const [errorVal, setError] = useState('');
     const [isRotating, setIsRotating] = useState(false);
     const [viewMode, setViewMode] = useState<'particles' | 'vectors'>('particles');
+    const [isWebGLUnavailable, setIsWebGLUnavailable] = useState(false);
     const viewModeRef = useRef<'particles' | 'vectors'>('particles');
     const isVisibleRef = useRef(true);
 
@@ -190,7 +191,21 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
         camera.position.set(15, 12, 15);
         cameraRef.current = camera;
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        const capabilityCanvas = document.createElement('canvas');
+        const webglContext = capabilityCanvas.getContext('webgl2') || capabilityCanvas.getContext('webgl');
+        if (!webglContext) {
+            setIsWebGLUnavailable(true);
+            return;
+        }
+
+        let renderer: THREE.WebGLRenderer;
+        try {
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        } catch (error) {
+            console.warn('MosDes WebGL renderer unavailable:', error);
+            setIsWebGLUnavailable(true);
+            return;
+        }
         renderer.setSize(width, height);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         containerRef.current.appendChild(renderer.domElement);
@@ -448,8 +463,20 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
             {/* Canvas Container */}
             <div ref={containerRef} className="absolute inset-0 z-0" />
 
+            {isWebGLUnavailable && (
+                <div className="absolute inset-0 z-10 grid place-items-center bg-black px-6 text-center">
+                    <div className="max-w-md border border-math-gold/25 bg-black/80 p-8">
+                        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-math-gold">Renderer unavailable</span>
+                        <h3 className="mt-3 font-serif text-3xl text-white">MosDes needs WebGL.</h3>
+                        <p className="mt-3 text-sm leading-relaxed text-white/50">
+                            Hardware acceleration is unavailable in this browser. The rest of the research labs remain fully interactive.
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* Floating UI Panel */}
-            <div className="absolute top-4 left-4 z-10 w-80 bg-black/80 backdrop-blur-md border border-white/10 rounded-lg p-4 shadow-lg text-xs font-mono">
+            {!isWebGLUnavailable && <div className="absolute top-4 left-4 z-10 w-80 bg-black/80 backdrop-blur-md border border-white/10 rounded-lg p-4 shadow-lg text-xs font-mono">
                 <div className="flex justify-between items-center border-b border-white/10 pb-2 mb-3">
                     <h3 className="text-math-gold uppercase tracking-[0.2em] text-sm font-bold">
                         MosDes <span className="text-white/40 font-thin ml-2">Console</span>
@@ -516,7 +543,7 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
                     <span>Particles: {PARTICLE_COUNT}</span>
                     <span>WebGL / Live</span>
                 </div>
-            </div>
+            </div>}
         </div>
     );
 }

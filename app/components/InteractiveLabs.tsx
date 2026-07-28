@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 type Aggregator = 'mean' | 'sum' | 'max';
@@ -206,101 +206,326 @@ export function GNNPlayground() {
   );
 }
 
-const SIGNALS = ['A', 'B', 'A', 'A', 'B', 'A', 'B', 'A'] as const;
-const CASCADE = (() => {
-  let publicA = 0;
-  let publicB = 0;
-  return SIGNALS.map(signal => {
-    const social = publicA - publicB;
-    const evidence = signal === 'A' ? 1 : -1;
-    const decision: 'A' | 'B' = social + evidence >= 0 ? 'A' : 'B';
-    if (decision === 'A') publicA += 1;
-    else publicB += 1;
-    return { signal, decision };
+const LIFE_COLUMNS = 60;
+const LIFE_ROWS = 32;
+const LIFE_SIZE = LIFE_COLUMNS * LIFE_ROWS;
+
+type LifePreset = 'glider' | 'pulsar' | 'gun' | 'random';
+
+const LIFE_PRESETS: Record<Exclude<LifePreset, 'random'>, Array<[number, number]>> = {
+  glider: [[1, 0], [2, 1], [0, 2], [1, 2], [2, 2]],
+  pulsar: [
+    [2, 0], [3, 0], [4, 0], [8, 0], [9, 0], [10, 0],
+    [0, 2], [5, 2], [7, 2], [12, 2], [0, 3], [5, 3], [7, 3], [12, 3],
+    [0, 4], [5, 4], [7, 4], [12, 4], [2, 5], [3, 5], [4, 5], [8, 5], [9, 5], [10, 5],
+    [2, 7], [3, 7], [4, 7], [8, 7], [9, 7], [10, 7],
+    [0, 8], [5, 8], [7, 8], [12, 8], [0, 9], [5, 9], [7, 9], [12, 9],
+    [0, 10], [5, 10], [7, 10], [12, 10], [2, 12], [3, 12], [4, 12], [8, 12], [9, 12], [10, 12],
+  ],
+  gun: [
+    [0, 4], [0, 5], [1, 4], [1, 5], [10, 4], [10, 5], [10, 6],
+    [11, 3], [11, 7], [12, 2], [12, 8], [13, 2], [13, 8], [14, 5],
+    [15, 3], [15, 7], [16, 4], [16, 5], [16, 6], [17, 5],
+    [20, 2], [20, 3], [20, 4], [21, 2], [21, 3], [21, 4],
+    [22, 1], [22, 5], [24, 0], [24, 1], [24, 5], [24, 6],
+    [34, 2], [34, 3], [35, 2], [35, 3],
+  ],
+};
+
+function evolveLife(board: Uint8Array, wrapEdges: boolean) {
+  const next = new Uint8Array(LIFE_SIZE);
+  let changed = false;
+
+  for (let row = 0; row < LIFE_ROWS; row += 1) {
+    for (let column = 0; column < LIFE_COLUMNS; column += 1) {
+      let neighbors = 0;
+      for (let rowOffset = -1; rowOffset <= 1; rowOffset += 1) {
+        for (let columnOffset = -1; columnOffset <= 1; columnOffset += 1) {
+          if (rowOffset === 0 && columnOffset === 0) continue;
+          let nextRow = row + rowOffset;
+          let nextColumn = column + columnOffset;
+          if (wrapEdges) {
+            nextRow = (nextRow + LIFE_ROWS) % LIFE_ROWS;
+            nextColumn = (nextColumn + LIFE_COLUMNS) % LIFE_COLUMNS;
+          } else if (nextRow < 0 || nextRow >= LIFE_ROWS || nextColumn < 0 || nextColumn >= LIFE_COLUMNS) {
+            continue;
+          }
+          if (board[nextRow * LIFE_COLUMNS + nextColumn] > 0) neighbors += 1;
+        }
+      }
+
+      const index = row * LIFE_COLUMNS + column;
+      const alive = board[index] > 0;
+      const survives = alive && (neighbors === 2 || neighbors === 3);
+      const born = !alive && neighbors === 3;
+      next[index] = survives ? Math.min(board[index] + 1, 12) : born ? 1 : 0;
+      if ((next[index] > 0) !== alive) changed = true;
+    }
+  }
+
+  return { board: next, changed };
+}
+
+function boardFromPreset(preset: LifePreset, density: number) {
+  const board = new Uint8Array(LIFE_SIZE);
+  if (preset === 'random') {
+    for (let index = 0; index < LIFE_SIZE; index += 1) {
+      if (Math.random() * 100 < density) board[index] = 1;
+    }
+    return board;
+  }
+
+  const pattern = LIFE_PRESETS[preset];
+  const patternWidth = Math.max(...pattern.map(([column]) => column)) + 1;
+  const patternHeight = Math.max(...pattern.map(([, row]) => row)) + 1;
+  const offsetColumn = Math.floor((LIFE_COLUMNS - patternWidth) / 2);
+  const offsetRow = Math.floor((LIFE_ROWS - patternHeight) / 2);
+  pattern.forEach(([column, row]) => {
+    board[(row + offsetRow) * LIFE_COLUMNS + column + offsetColumn] = 1;
   });
-})();
+  return board;
+}
 
-export function CollectiveLab() {
-  const [mode, setMode] = useState<'coordination' | 'cascade'>('coordination');
-  const [expectation, setExpectation] = useState(62);
-  const [choice, setChoice] = useState<'Gold' | 'Cyan' | null>(null);
-  const [revealed, setRevealed] = useState(0);
+export function LifeLab() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isDrawingRef = useRef(false);
+  const drawAliveRef = useRef(true);
+  const [board, setBoard] = useState(() => boardFromPreset('gun', 25));
+  const [isRunning, setIsRunning] = useState(false);
+  const [generation, setGeneration] = useState(0);
+  const [speed, setSpeed] = useState(120);
+  const [density, setDensity] = useState(25);
+  const [wrapEdges, setWrapEdges] = useState(false);
+  const [status, setStatus] = useState('Ready');
+  const [preset, setPreset] = useState<LifePreset>('gun');
 
-  const goldPayoff = expectation / 25;
-  const cyanPayoff = (100 - expectation) / 33.3;
-  const recommendation = goldPayoff >= cyanPayoff ? 'Gold' : 'Cyan';
+  const population = useMemo(
+    () => board.reduce((total, cell) => total + (cell > 0 ? 1 : 0), 0),
+    [board],
+  );
+  const oldestCell = useMemo(
+    () => board.reduce((oldest, cell) => Math.max(oldest, cell), 0),
+    [board],
+  );
+
+  const advance = () => {
+    const result = evolveLife(board, wrapEdges);
+    setBoard(result.board);
+    if (!result.changed) {
+      setIsRunning(false);
+      setStatus(result.board.some(cell => cell > 0) ? 'Stable configuration' : 'Extinct');
+    } else {
+      setStatus('Evolving');
+    }
+    setGeneration(current => current + 1);
+  };
+
+  const tick = useEffectEvent(advance);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const interval = window.setInterval(() => tick(), speed);
+    return () => window.clearInterval(interval);
+  }, [isRunning, speed]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+
+    const cellWidth = canvas.width / LIFE_COLUMNS;
+    const cellHeight = canvas.height / LIFE_ROWS;
+    context.fillStyle = '#030303';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    context.strokeStyle = 'rgba(255,255,255,0.045)';
+    context.lineWidth = 1;
+    context.beginPath();
+    for (let column = 0; column <= LIFE_COLUMNS; column += 1) {
+      context.moveTo(column * cellWidth, 0);
+      context.lineTo(column * cellWidth, canvas.height);
+    }
+    for (let row = 0; row <= LIFE_ROWS; row += 1) {
+      context.moveTo(0, row * cellHeight);
+      context.lineTo(canvas.width, row * cellHeight);
+    }
+    context.stroke();
+
+    board.forEach((age, index) => {
+      if (age === 0) return;
+      const column = index % LIFE_COLUMNS;
+      const row = Math.floor(index / LIFE_COLUMNS);
+      const maturity = Math.min(age / 8, 1);
+      const red = Math.round(92 + (244 - 92) * maturity);
+      const green = Math.round(205 + (196 - 205) * maturity);
+      const blue = Math.round(211 + (48 - 211) * maturity);
+      context.shadowColor = `rgba(${red},${green},${blue},0.55)`;
+      context.shadowBlur = age === 1 ? 9 : 4;
+      context.fillStyle = `rgb(${red},${green},${blue})`;
+      context.fillRect(
+        column * cellWidth + 1.5,
+        row * cellHeight + 1.5,
+        Math.max(1, cellWidth - 3),
+        Math.max(1, cellHeight - 3),
+      );
+    });
+    context.shadowBlur = 0;
+  }, [board]);
+
+  const resetWithPreset = (nextPreset: LifePreset) => {
+    setPreset(nextPreset);
+    setBoard(boardFromPreset(nextPreset, density));
+    setGeneration(0);
+    setIsRunning(false);
+    setStatus('Ready');
+  };
+
+  const paintCell = (clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const bounds = canvas.getBoundingClientRect();
+    const column = Math.floor(((clientX - bounds.left) / bounds.width) * LIFE_COLUMNS);
+    const row = Math.floor(((clientY - bounds.top) / bounds.height) * LIFE_ROWS);
+    if (column < 0 || column >= LIFE_COLUMNS || row < 0 || row >= LIFE_ROWS) return;
+    const index = row * LIFE_COLUMNS + column;
+    setBoard(current => {
+      if ((current[index] > 0) === drawAliveRef.current) return current;
+      const next = current.slice();
+      next[index] = drawAliveRef.current ? 1 : 0;
+      return next;
+    });
+    setStatus('Edited');
+  };
 
   return (
-    <section id="collective-lab" className="lab-shell">
+    <section id="life-lab" className="lab-shell life-lab">
       <div className="lab-header">
-        <div>
-          <span className="lab-index">LAB 02 / COLLECTIVE BEHAVIOR</span>
-          <h3>Beliefs in Public</h3>
+        <div className="lab-title-block">
+          <span className="lab-index">LAB 02 / EMERGENT SYSTEMS</span>
+          <h3>Life, from Four Rules</h3>
+          <p>Draw an initial world, release time, and watch local decisions become global structure.</p>
         </div>
-        <div className="lab-tabs">
-          <button onClick={() => setMode('coordination')} className={mode === 'coordination' ? 'active' : ''}>Coordination</button>
-          <button onClick={() => setMode('cascade')} className={mode === 'cascade' ? 'active' : ''}>Cascade</button>
+        <div className="life-rule">
+          <span>Conway&apos;s rule</span>
+          <strong>B3 / S23</strong>
         </div>
       </div>
 
-      {mode === 'coordination' ? (
-        <div className="collective-grid">
-          <div className="coordination-stage">
-            <p>You score highly when your choice matches the crowd. Which equilibrium should you select?</p>
-            <div className="choice-pair">
-              <button onClick={() => setChoice('Gold')} className={choice === 'Gold' ? 'selected gold' : 'gold'}>
-                <span>G</span><strong>Gold</strong><small>Expected payoff {goldPayoff.toFixed(1)}</small>
-              </button>
-              <button onClick={() => setChoice('Cyan')} className={choice === 'Cyan' ? 'selected cyan' : 'cyan'}>
-                <span>C</span><strong>Cyan</strong><small>Expected payoff {cyanPayoff.toFixed(1)}</small>
-              </button>
-            </div>
-          </div>
-          <div className="lab-controls">
-            <label className="range-label" htmlFor="crowd-expectation">
-              Expected crowd choosing Gold <strong>{expectation}%</strong>
-            </label>
-            <input
-              id="crowd-expectation"
-              type="range"
-              min="0"
-              max="100"
-              value={expectation}
-              onChange={event => setExpectation(Number(event.target.value))}
-            />
-            <div className="equilibrium-readout">
-              <span>Best response</span>
-              <strong>{recommendation}</strong>
-              <p>{choice ? `You chose ${choice}. ` : ''}Expectations can select an equilibrium even when neither option is intrinsically better.</p>
-            </div>
+      <div className="life-grid">
+        <div className="life-stage">
+          <canvas
+            ref={canvasRef}
+            width="1200"
+            height="640"
+            aria-label="Interactive Conway's Game of Life grid. Drag to draw or erase cells."
+            onPointerDown={event => {
+              const bounds = event.currentTarget.getBoundingClientRect();
+              const column = Math.floor(((event.clientX - bounds.left) / bounds.width) * LIFE_COLUMNS);
+              const row = Math.floor(((event.clientY - bounds.top) / bounds.height) * LIFE_ROWS);
+              const index = row * LIFE_COLUMNS + column;
+              drawAliveRef.current = !(board[index] > 0);
+              isDrawingRef.current = true;
+              event.currentTarget.setPointerCapture(event.pointerId);
+              paintCell(event.clientX, event.clientY);
+            }}
+            onPointerMove={event => {
+              if (isDrawingRef.current) paintCell(event.clientX, event.clientY);
+            }}
+            onPointerUp={event => {
+              isDrawingRef.current = false;
+              event.currentTarget.releasePointerCapture(event.pointerId);
+            }}
+            onPointerCancel={() => {
+              isDrawingRef.current = false;
+            }}
+          />
+          <div className="life-stage-footer">
+            <span><i className="life-dot newborn" />Newborn</span>
+            <span><i className="life-dot mature" />Survivor</span>
+            <span>Drag empty cells to draw. Drag live cells to erase.</span>
           </div>
         </div>
-      ) : (
-        <div className="collective-grid">
-          <div className="cascade-stage">
-            {CASCADE.map((agent, index) => (
-              <div key={index} className={`cascade-agent ${index < revealed ? `revealed decision-${agent.decision}` : ''}`}>
-                <span>{index + 1}</span>
-                <strong>{index < revealed ? agent.decision : '?'}</strong>
-                <small>{index < revealed ? `private ${agent.signal}` : 'hidden'}</small>
-              </div>
+
+        <div className="lab-controls life-controls">
+          <ControlGroup label="Initial condition">
+            {(['glider', 'pulsar', 'gun', 'random'] as LifePreset[]).map(item => (
+              <button key={item} onClick={() => resetWithPreset(item)} className={preset === item ? 'active' : ''}>
+                {item === 'gun' ? 'Gosper gun' : item}
+              </button>
             ))}
+          </ControlGroup>
+
+          <div className="life-stats">
+            <div><span>Generation</span><strong>{generation.toLocaleString()}</strong></div>
+            <div><span>Population</span><strong>{population.toLocaleString()}</strong></div>
+            <div><span>Oldest cell</span><strong>{oldestCell}</strong></div>
+            <div><span>State</span><strong>{isRunning ? 'Running' : status}</strong></div>
           </div>
-          <div className="lab-controls">
-            <div className="equilibrium-readout">
-              <span>Public sequence</span>
-              <strong>{CASCADE.slice(0, revealed).map(item => item.decision).join(' ') || 'No decisions yet'}</strong>
-              <p>Agents observe earlier choices, not earlier evidence. Once a lead forms, private disagreement can disappear from public view.</p>
-            </div>
-            <div className="lab-actions">
-              <button onClick={() => setRevealed(value => Math.min(SIGNALS.length, value + 1))} disabled={revealed === SIGNALS.length}>
-                Reveal next
-              </button>
-              <button onClick={() => setRevealed(0)}>Reset</button>
-            </div>
+
+          <label className="range-label" htmlFor="life-speed">
+            Tick interval <strong>{speed} ms</strong>
+          </label>
+          <input
+            id="life-speed"
+            type="range"
+            min="40"
+            max="500"
+            step="20"
+            value={speed}
+            onChange={event => setSpeed(Number(event.target.value))}
+          />
+
+          <label className="range-label" htmlFor="life-density">
+            Random density <strong>{density}%</strong>
+          </label>
+          <input
+            id="life-density"
+            type="range"
+            min="5"
+            max="60"
+            value={density}
+            onChange={event => setDensity(Number(event.target.value))}
+          />
+
+          <button
+            type="button"
+            className={`topology-toggle ${wrapEdges ? 'active' : ''}`}
+            onClick={() => setWrapEdges(current => !current)}
+            aria-pressed={wrapEdges}
+          >
+            <span>World topology</span>
+            <strong>{wrapEdges ? 'Toroidal / wrapped' : 'Bounded edges'}</strong>
+          </button>
+
+          <div className="lab-actions">
+            <button
+              onClick={() => {
+                setIsRunning(current => !current);
+                setStatus(isRunning ? 'Paused' : 'Evolving');
+              }}
+            >
+              {isRunning ? 'Pause' : 'Run life'}
+            </button>
+            <button onClick={advance} disabled={isRunning}>Step</button>
           </div>
+          <button
+            className="life-clear"
+            onClick={() => {
+              setBoard(new Uint8Array(LIFE_SIZE));
+              setGeneration(0);
+              setIsRunning(false);
+              setStatus('Empty world');
+            }}
+          >
+            Clear world
+          </button>
+
+          <p className="lab-note">
+            A cell is born with exactly three neighbors and survives with two or three. Everything else here emerges from repeated local updates.
+          </p>
         </div>
-      )}
+      </div>
     </section>
   );
 }

@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { PathfindingGrid, runAStar, runDijkstra, runBFS, runDFS } from './algorithms';
 import GraphSimulation from './components/GraphSimulation';
-import { CollectiveLab, GNNPlayground } from './components/InteractiveLabs';
+import { GNNPlayground, LifeLab } from './components/InteractiveLabs';
 
 const JOURNAL_URL = process.env.NEXT_PUBLIC_JOURNAL_URL
   || (process.env.NODE_ENV === 'development'
@@ -88,76 +88,15 @@ export default function Home() {
   const [insight, setInsight] = useState(VIZ_DESCRIPTIONS['matrix']);
   const [isUpdatingInsight, setIsUpdatingInsight] = useState(false);
   const [isOverlayMinimized, setIsOverlayMinimized] = useState(false);
+  const [isInsightSuppressed, setIsInsightSuppressed] = useState(false);
   const [isMosDesActive, setIsMosDesActive] = useState(false);
   const isMosDesActiveRef = useRef(false);
   const mosDesSectionRef = useRef<HTMLElement>(null);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sync ref for animation loop
   useEffect(() => {
     isMosDesActiveRef.current = isMosDesActive;
   }, [isMosDesActive]);
-
-  // Lazy Scroll Logic: Intersection Observer + Scroll Stability Check
-  useEffect(() => {
-    const section = mosDesSectionRef.current;
-    if (!section) return;
-
-    let isIntersecting = false;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        isIntersecting = entry.isIntersecting;
-
-        // Immediate entry if stable
-        if (isIntersecting && !scrollTimeoutRef.current) {
-          setIsMosDesActive(true);
-        } else if (!isIntersecting) {
-          setIsMosDesActive(false);
-        }
-      },
-      { threshold: 0.7 } // High threshold: must be mostly visible
-    );
-
-    observer.observe(section);
-
-    // Scroll Stability Listener
-    const handleScroll = () => {
-      // If we are scrolling, temporarily disable active state to prevent jitter
-      if (isIntersecting) {
-        // Only debounce exit if we are actually active
-        if (isMosDesActiveRef.current) {
-          // Optional: could force exit here if scroll is fast, 
-          // but user asked for "definitive scroll". 
-          // Let's use a timeout to detect when scroll STOPS.
-        }
-      }
-
-      // On any scroll event, check if we should exit due to "definitive scroll" away
-      // actually standard intersection observer handles "scroll away" well with threshold.
-      // User request: "lazy scroll highlight... if there's a definitive scroll... exit"
-
-      // Implementation: 
-      // We use the observer for entering (high threshold).
-      // For exiting, we trust the observer's exit.
-      // BUT, to prevent "dimming and un dimming" during small adjustments,
-      // we can add a lock or delay. 
-    };
-
-    // Refined Logic per user request:
-    // "prop it up to then and if there's a definitive scroll not adjustment then we exit"
-
-    // We will use TWO observers.
-    // 1. Strict observer for ENTERING (threshold 0.75)
-    // 2. Loose observer for EXITING (threshold 0.3)
-    // This creates hysteresis.
-
-    return () => {
-      observer.disconnect();
-      // window.removeEventListener('scroll', handleScroll);
-    };
-  }, []); // Re-run if ref changes? No ref is stable.
 
   // Hysteresis Observer Implementation
   useEffect(() => {
@@ -212,6 +151,23 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    const sections = document.querySelectorAll<HTMLElement>('[data-hide-insight]');
+    const visibleSections = new Set<Element>();
+    const observer = new IntersectionObserver(
+      entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) visibleSections.add(entry.target);
+          else visibleSections.delete(entry.target);
+        });
+        setIsInsightSuppressed(visibleSections.size > 0);
+      },
+      { rootMargin: '-80px 0px -20% 0px', threshold: 0 },
+    );
+    sections.forEach(section => observer.observe(section));
+    return () => observer.disconnect();
+  }, []);
+
   // Configuration Ref to share state with Three.js loop without re-renders
   const configRef = useRef({
     particleCount: 1200, // Will be adjusted in useEffect based on window
@@ -259,7 +215,20 @@ export default function Home() {
     camera.position.y = 8;
     camera.lookAt(0, 0, 0);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const capabilityCanvas = document.createElement('canvas');
+    const webglContext = capabilityCanvas.getContext('webgl2') || capabilityCanvas.getContext('webgl');
+    if (!webglContext) {
+      console.warn('Background particle renderer disabled: WebGL is unavailable.');
+      return;
+    }
+
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    } catch (error) {
+      console.warn('Background particle renderer unavailable:', error);
+      return;
+    }
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
@@ -782,25 +751,35 @@ export default function Home() {
       </nav>
 
       {/* Insight Overlay */}
-      <div className="fixed bottom-24 left-4 right-4 z-40 md:right-8 md:bottom-24 md:w-auto md:left-auto md:max-w-sm">
-        <motion.div
-          className="glass-panel p-4 md:p-6 border-l-2 border-l-math-gold bg-black/20 backdrop-blur-md cursor-pointer"
-          onClick={() => setIsOverlayMinimized(!isOverlayMinimized)}
-          animate={{
-            opacity: isUpdatingInsight ? 0 : (isOverlayMinimized ? 0.6 : 1),
-            y: isUpdatingInsight ? 10 : (isOverlayMinimized ? 120 : 0),
-            scale: isOverlayMinimized ? 0.9 : 1
-          }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        >
-          <h4 className="text-math-gold font-serif text-lg italic mb-2">{insight.title}</h4>
-          <p className="text-xs text-gray-300 leading-relaxed">{insight.text}</p>
-          <div className="mt-3 flex gap-2 items-center">
-            <div className="w-2 h-2 rounded-full bg-math-gold animate-pulse"></div>
-            <span className="text-[10px] uppercase tracking-widest text-white/50">Live Render</span>
-          </div>
-        </motion.div>
-      </div>
+      <AnimatePresence>
+        {!isInsightSuppressed && (
+          <motion.div
+            className="fixed bottom-24 left-4 right-4 z-40 md:right-8 md:bottom-24 md:w-auto md:left-auto md:max-w-sm"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.25 }}
+          >
+            <motion.div
+              className="glass-panel p-4 md:p-6 border-l-2 border-l-math-gold bg-black/20 backdrop-blur-md cursor-pointer"
+              onClick={() => setIsOverlayMinimized(!isOverlayMinimized)}
+              animate={{
+                opacity: isUpdatingInsight ? 0 : (isOverlayMinimized ? 0.6 : 1),
+                y: isUpdatingInsight ? 10 : (isOverlayMinimized ? 120 : 0),
+                scale: isOverlayMinimized ? 0.9 : 1
+              }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            >
+              <h4 className="text-math-gold font-serif text-lg italic mb-2">{insight.title}</h4>
+              <p className="text-xs text-gray-300 leading-relaxed">{insight.text}</p>
+              <div className="mt-3 flex gap-2 items-center">
+                <div className="w-2 h-2 rounded-full bg-math-gold animate-pulse"></div>
+                <span className="text-[10px] uppercase tracking-widest text-white/50">Live Render</span>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <main className="relative z-10 pt-20">
 
@@ -856,7 +835,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="labs" className="py-28 relative">
+        <section id="labs" data-hide-insight className="py-28 relative">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-14 max-w-3xl">
               <span className="text-math-gold font-mono text-xs uppercase tracking-widest block mb-3">Interactive Research Labs</span>
@@ -867,7 +846,7 @@ export default function Home() {
             </div>
             <div className="space-y-10">
               <GNNPlayground />
-              <CollectiveLab />
+              <LifeLab />
             </div>
           </div>
         </section>
@@ -962,7 +941,7 @@ export default function Home() {
         </section>
 
         {/* MosDes Section */}
-        <section id="mosdes" ref={mosDesSectionRef} className={`py-12 relative transition-all duration-700 ${isMosDesActive ? 'z-50 py-4 scale-[1.02]' : 'z-10'}`}>
+        <section id="mosdes" data-hide-insight ref={mosDesSectionRef} className={`py-12 relative transition-all duration-700 ${isMosDesActive ? 'z-50 py-4 scale-[1.02]' : 'z-10'}`}>
           <div className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-[-1] transition-opacity duration-700 pointer-events-none ${isMosDesActive ? 'opacity-100' : 'opacity-0'}`} />
 
           <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
@@ -1008,28 +987,28 @@ export default function Home() {
                   <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-math-gold/50 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
                 </button>
 
-                {/* Graph Neural Networks */}
-                <button onClick={() => document.getElementById('gnn-lab')?.scrollIntoView({ behavior: 'smooth' })} className="group relative bg-black/20 hover:bg-black/40 backdrop-blur-sm p-8 text-left transition-all border border-white/10 hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
+                {/* Quant */}
+                <button onClick={() => changeVizMode('quant')} className="group relative bg-black/20 hover:bg-black/40 backdrop-blur-sm p-8 text-left transition-all border border-white/10 hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
                   <div className="flex justify-between items-start z-10 relative">
                     <span className="text-math-gold text-xl font-serif">II.</span>
                     <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
                   </div>
                   <div className="z-10 relative">
-                    <h3 className="text-white font-bold mb-1 group-hover:text-math-gold transition-colors">Graph Neural Networks</h3>
-                    <p className="text-xs text-gray-500 uppercase tracking-widest">Message Passing</p>
+                    <h3 className="text-white font-bold mb-1 group-hover:text-math-gold transition-colors">Monte Carlo</h3>
+                    <p className="text-xs text-gray-500 uppercase tracking-widest">Quant Finance</p>
                   </div>
                   <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-math-gold/50 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
                 </button>
 
                 {/* Nash */}
-                <button onClick={() => document.getElementById('collective-lab')?.scrollIntoView({ behavior: 'smooth' })} className="group relative bg-black/20 hover:bg-black/40 backdrop-blur-sm p-8 text-left transition-all border border-white/10 hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
+                <button onClick={() => changeVizMode('nash')} className="group relative bg-black/20 hover:bg-black/40 backdrop-blur-sm p-8 text-left transition-all border border-white/10 hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
                   <div className="flex justify-between items-start z-10 relative">
                     <span className="text-math-gold text-xl font-serif">III.</span>
                     <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]"></div>
                   </div>
                   <div className="z-10 relative">
-                    <h3 className="text-white font-bold mb-1 group-hover:text-math-gold transition-colors">Collective Behavior</h3>
-                    <p className="text-xs text-gray-500 uppercase tracking-widest">Coordination & Cascades</p>
+                    <h3 className="text-white font-bold mb-1 group-hover:text-math-gold transition-colors">Nash Equilibrium</h3>
+                    <p className="text-xs text-gray-500 uppercase tracking-widest">Game Theory</p>
                   </div>
                   <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-math-gold/50 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
                 </button>
