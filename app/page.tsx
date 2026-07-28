@@ -2,9 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { PathfindingGrid, runAStar, runDijkstra, runBFS, runDFS } from './algorithms';
 import GraphSimulation from './components/GraphSimulation';
+import { CollectiveLab, GNNPlayground } from './components/InteractiveLabs';
+
+const JOURNAL_URL = process.env.NEXT_PUBLIC_JOURNAL_URL
+  || (process.env.NODE_ENV === 'development'
+    ? 'http://localhost:8080'
+    : 'https://github.com/ananyasahani/TheTuringCircle_blogpost');
 
 // Visualization descriptions for the Insight Box
 const VIZ_DESCRIPTIONS: Record<string, { title: string; text: string }> = {
@@ -22,7 +28,7 @@ const VIZ_DESCRIPTIONS: Record<string, { title: string; text: string }> = {
   },
   threebody: {
     title: "The Three-Body Problem",
-    text: "Three distinct gravitational clusters interact chaotically. While the system appears stable, small perturbations can lead to unpredictable trajectories."
+    text: "A conceptual cluster study inspired by chaotic three-body motion. This mode illustrates sensitivity and interacting trajectories; it is not a numerical gravity solver."
   },
   lorenz: {
     title: "The Lorenz Attractor",
@@ -190,17 +196,14 @@ export default function Home() {
 
   // Auto-minimize overlay on mobile after generic interaction or time
   useEffect(() => {
-    let timeout: NodeJS.Timeout;
+    const timeout: NodeJS.Timeout = setTimeout(() => {
+      if (window.innerWidth < 768) setIsOverlayMinimized(true);
+    }, 5000);
     const handleScroll = () => {
       if (window.innerWidth < 768) {
         setIsOverlayMinimized(true);
       }
     };
-
-    // Initial timer
-    timeout = setTimeout(() => {
-      if (window.innerWidth < 768) setIsOverlayMinimized(true);
-    }, 5000);
 
     window.addEventListener('scroll', handleScroll);
     return () => {
@@ -265,7 +268,7 @@ export default function Home() {
     let particles: THREE.Points;
     let linesMesh: THREE.LineSegments;
     let animationId: number;
-    let mouse = new THREE.Vector2();
+    const mouse = new THREE.Vector2();
     const isMobile = window.innerWidth < 768;
 
     configRef.current.particleCount = isMobile ? 800 : 1500;
@@ -370,7 +373,7 @@ export default function Home() {
 
         const cosU = Math.cos(u), sinU = Math.sin(u);
         const cosU2 = Math.cos(u / 2), sinU2 = Math.sin(u / 2);
-        const cosV = Math.cos(v), sinV = Math.sin(v);
+        const sinV = Math.sin(v);
         const sin2V = Math.sin(2 * v);
 
         // Figure-8 Klein Bottle equations
@@ -595,7 +598,7 @@ export default function Home() {
         // Advance Generator Steps
         algoRunnerRef.current.timer += 1;
         if (algoRunnerRef.current.timer % 2 === 0 && algoRunnerRef.current.generator && algoRunnerRef.current.grid) {
-          const res = algoRunnerRef.current.generator.next();
+          algoRunnerRef.current.generator.next();
           // if res.done, we stop animating but keep rendering state
         }
 
@@ -768,8 +771,9 @@ export default function Home() {
                   <a href="#home" className="nav-link text-white hover:text-math-gold px-3 py-2 transition-colors">Home</a>
                   <a href="#manifesto" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Manifesto</a>
                   <a href="#research" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Foundations</a>
-                  <a href="#domains" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Domains</a>
-                  <a href="https://theturingcircle.vercel.app/" target="_blank" className="btn-gold px-4 py-2 rounded-sm uppercase">Join Club</a>
+                  <a href="#labs" className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Labs</a>
+                  <a href={JOURNAL_URL} className="nav-link text-white/70 hover:text-math-gold px-3 py-2 transition-colors">Journal</a>
+                  <a href="https://theturingcircle.vercel.app/" target="_blank" rel="noreferrer" className="btn-gold px-4 py-2 rounded-sm uppercase">Join Club</a>
                 </div>
               </div>
             </div>
@@ -852,6 +856,22 @@ export default function Home() {
           </div>
         </section>
 
+        <section id="labs" className="py-28 relative">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="mb-14 max-w-3xl">
+              <span className="text-math-gold font-mono text-xs uppercase tracking-widest block mb-3">Interactive Research Labs</span>
+              <h2 className="font-serif text-5xl md:text-6xl text-white mb-5">Models you can interrogate.</h2>
+              <p className="text-gray-400 text-lg font-light leading-relaxed">
+                These are not looping illustrations. Change the assumptions, advance the model, and inspect where the behavior comes from.
+              </p>
+            </div>
+            <div className="space-y-10">
+              <GNNPlayground />
+              <CollectiveLab />
+            </div>
+          </div>
+        </section>
+
         {/* Manifesto */}
         <section id="manifesto" className="py-24 relative">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -911,7 +931,7 @@ export default function Home() {
                     <div className="w-8 h-8 bg-math-gold/20 rounded-full"></div>
                   </div>
                 </div>
-                <h3 className="text-lg font-serif text-white mb-2 group-hover:text-math-gold transition-colors">Dijkstra's Algo</h3>
+                <h3 className="text-lg font-serif text-white mb-2 group-hover:text-math-gold transition-colors">Dijkstra&apos;s Algo</h3>
               </div>
 
               {/* BFS */}
@@ -988,28 +1008,28 @@ export default function Home() {
                   <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-math-gold/50 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
                 </button>
 
-                {/* Quant */}
-                <button onClick={() => changeVizMode('quant')} className="group relative bg-black/20 hover:bg-black/40 backdrop-blur-sm p-8 text-left transition-all border border-white/10 hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
+                {/* Graph Neural Networks */}
+                <button onClick={() => document.getElementById('gnn-lab')?.scrollIntoView({ behavior: 'smooth' })} className="group relative bg-black/20 hover:bg-black/40 backdrop-blur-sm p-8 text-left transition-all border border-white/10 hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
                   <div className="flex justify-between items-start z-10 relative">
                     <span className="text-math-gold text-xl font-serif">II.</span>
                     <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
                   </div>
                   <div className="z-10 relative">
-                    <h3 className="text-white font-bold mb-1 group-hover:text-math-gold transition-colors">Monte Carlo</h3>
-                    <p className="text-xs text-gray-500 uppercase tracking-widest">Quant Finance</p>
+                    <h3 className="text-white font-bold mb-1 group-hover:text-math-gold transition-colors">Graph Neural Networks</h3>
+                    <p className="text-xs text-gray-500 uppercase tracking-widest">Message Passing</p>
                   </div>
                   <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-math-gold/50 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
                 </button>
 
                 {/* Nash */}
-                <button onClick={() => changeVizMode('nash')} className="group relative bg-black/20 hover:bg-black/40 backdrop-blur-sm p-8 text-left transition-all border border-white/10 hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
+                <button onClick={() => document.getElementById('collective-lab')?.scrollIntoView({ behavior: 'smooth' })} className="group relative bg-black/20 hover:bg-black/40 backdrop-blur-sm p-8 text-left transition-all border border-white/10 hover:border-math-gold/30 h-48 flex flex-col justify-between overflow-hidden">
                   <div className="flex justify-between items-start z-10 relative">
                     <span className="text-math-gold text-xl font-serif">III.</span>
                     <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]"></div>
                   </div>
                   <div className="z-10 relative">
-                    <h3 className="text-white font-bold mb-1 group-hover:text-math-gold transition-colors">Nash Equilibrium</h3>
-                    <p className="text-xs text-gray-500 uppercase tracking-widest">Game Theory</p>
+                    <h3 className="text-white font-bold mb-1 group-hover:text-math-gold transition-colors">Collective Behavior</h3>
+                    <p className="text-xs text-gray-500 uppercase tracking-widest">Coordination & Cascades</p>
                   </div>
                   <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-math-gold/50 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
                 </button>
@@ -1027,7 +1047,8 @@ export default function Home() {
               <p className="text-white/40 text-xs mt-1">Est. 2025</p>
             </div>
             <div className="flex space-x-6">
-              <a href="https://github.com/Circle-Turing" target="_blank" className="text-white/40 hover:text-math-gold text-sm">GitHub</a>
+              <a href={JOURNAL_URL} className="text-white/40 hover:text-math-gold text-sm">Journal</a>
+              <a href="https://github.com/Circle-Turing" target="_blank" rel="noreferrer" className="text-white/40 hover:text-math-gold text-sm">GitHub</a>
             </div>
           </div>
         </footer>

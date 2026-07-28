@@ -85,7 +85,7 @@ export function* runAStar(grid: PathfindingGrid, start: Point, end: Point) {
   startNode.heuristic = heuristic(startNode, endNode);
   startNode.state = 'open';
 
-  let openSet: GridNode[] = [startNode];
+  const openSet: GridNode[] = [startNode];
   let step = 0;
 
   while (openSet.length > 0) {
@@ -139,8 +139,7 @@ export function* runDijkstra(grid: PathfindingGrid, start: Point, end: Point) {
   startNode.distance = 0;
   startNode.state = 'open';
 
-  let openSet: GridNode[] = [startNode];
-  let step = 0;
+  const openSet: GridNode[] = [startNode];
 
   while (openSet.length > 0) {
     openSet.sort((a, b) => a.distance - b.distance);
@@ -186,8 +185,6 @@ export function* runBFS(grid: PathfindingGrid, start: Point, end: Point) {
   startNode.state = 'open';
   const visited = new Set<GridNode>();
   visited.add(startNode);
-  let step = 0;
-
   while (queue.length > 0) {
     const current = queue.shift()!;
     if (current === endNode) {

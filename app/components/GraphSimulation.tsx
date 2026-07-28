@@ -3,9 +3,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { compile, type EvalFunction } from 'mathjs';
 
 // --- Configuration ---
-const PARTICLE_COUNT = 60000;
+const PARTICLE_COUNT = 28000;
 const RANGE = 10;
 const PARTICLE_SIZE = 0.08;
 const TRANSITION_SPEED = 0.02;
@@ -20,6 +21,8 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
     const [errorVal, setError] = useState('');
     const [isRotating, setIsRotating] = useState(false);
     const [viewMode, setViewMode] = useState<'particles' | 'vectors'>('particles');
+    const viewModeRef = useRef<'particles' | 'vectors'>('particles');
+    const isVisibleRef = useRef(true);
 
     // Refs to keep track of Three.js objects across renders
     const sceneRef = useRef<THREE.Scene | null>(null);
@@ -31,7 +34,7 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
     const animationIdRef = useRef<number | null>(null);
 
     // Logic Refs
-    const currentFunctionRef = useRef<Function | null>(null);
+    const currentFunctionRef = useRef<((x: number, y: number, t: number) => number) | null>(null);
     const isTimeDependentRef = useRef(false);
     const timeRef = useRef(0);
 
@@ -44,41 +47,39 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
 
     // --- Math Parsing Utilities ---
     const parseEquation = (equationStr: string) => {
-        let cleanEq = equationStr.toLowerCase().replace(/\s+/g, '');
-        cleanEq = cleanEq.replace(/\^/g, '**');
-        cleanEq = cleanEq.replace(/(?<!\d)\.(?!\d)/g, '*'); // Dot product fix
-
-        const mathMap: Record<string, string> = {
-            'sin': 'Math.sin', 'cos': 'Math.cos', 'tan': 'Math.tan',
-            'asin': 'Math.asin', 'acos': 'Math.acos', 'atan': 'Math.atan',
-            'atan2': 'Math.atan2', 'sqrt': 'Math.sqrt', 'cbrt': 'Math.cbrt',
-            'abs': 'Math.abs', 'floor': 'Math.floor', 'ceil': 'Math.ceil',
-            'round': 'Math.round', 'max': 'Math.max', 'min': 'Math.min',
-            'log': 'Math.log', 'ln': 'Math.log', 'log10': 'Math.log10',
-            'exp': 'Math.exp', 'pi': 'Math.PI', 'e': 'Math.E'
-        };
-
-        const keys = Object.keys(mathMap).sort((a, b) => b.length - a.length);
-        keys.forEach(key => {
-            const replacement = mathMap[key];
-            if (key === 'pi' || key === 'e') {
-                const regex = new RegExp(`(?<![a-z])${key}(?![a-z])`, 'g');
-                cleanEq = cleanEq.replace(regex, replacement);
-            } else {
-                const regex = new RegExp(`(?<![a-z])${key}(?=\\()`, 'g');
-                cleanEq = cleanEq.replace(regex, replacement);
-            }
-        });
-
+        const allowed = new Set([
+            'x', 'y', 't', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2',
+            'sqrt', 'cbrt', 'abs', 'floor', 'ceil', 'round', 'max', 'min',
+            'log', 'log10', 'exp', 'pi', 'e',
+        ]);
+        const names = equationStr.toLowerCase().match(/[a-z_]+/g) || [];
+        if (names.some(name => !allowed.has(name))) return null;
         try {
-            const f = new Function('x', 'y', 't', `return ${cleanEq};`);
-            f(1, 1, 0); // Dry run check
-            return f;
-        } catch (e: any) {
-            console.warn("Equation parse warning:", e.message);
+            const expression: EvalFunction = compile(equationStr.toLowerCase());
+            const evaluate = (x: number, y: number, t: number) => Number(expression.evaluate({ x, y, t }));
+            evaluate(1, 1, 0);
+            return evaluate;
+        } catch (error) {
+            console.warn("Equation parse warning:", error);
             return null;
         }
     };
+
+    useEffect(() => {
+        viewModeRef.current = viewMode;
+        if (particlesRef.current) particlesRef.current.visible = viewMode === 'particles';
+        if (arrowsMeshRef.current) arrowsMeshRef.current.visible = viewMode === 'vectors';
+    }, [viewMode]);
+
+    useEffect(() => {
+        const element = containerRef.current;
+        if (!element) return;
+        const observer = new IntersectionObserver(([entry]) => {
+            isVisibleRef.current = entry.isIntersecting;
+        }, { threshold: 0.05 });
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, []);
 
     const getPastelColor = (t: number, targetColor: THREE.Color) => {
         const r1 = 0.44, g1 = 0.84, b1 = 1.0; // Cyan #70d6ff
@@ -111,7 +112,7 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
                 if (!isFinite(z)) z = 0;
                 if (z > 20) z = 20;
                 if (z < -20) z = -20;
-            } catch (e) { z = 0; }
+            } catch { z = 0; }
 
             targetZRef.current[i] = z;
             if (z < minZ) minZ = z;
@@ -124,7 +125,7 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
 
         for (let i = 0; i < PARTICLE_COUNT; i++) {
             const z = targetZRef.current[i];
-            let tNorm = (z - minZ) / zRange;
+            const tNorm = (z - minZ) / zRange;
             getPastelColor(tNorm, tempColor);
 
             targetColorsRef.current[i * 3] = tempColor.r;
@@ -191,7 +192,7 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(width, height);
-        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         containerRef.current.appendChild(renderer.domElement);
         rendererRef.current = renderer;
 
@@ -277,6 +278,7 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
         // ANIMATION LOOP
         const animate = () => {
             animationIdRef.current = requestAnimationFrame(animate);
+            if (!isVisibleRef.current || document.hidden) return;
 
             timeRef.current += 0.02;
             if (controlsRef.current) controlsRef.current.update();
@@ -289,8 +291,8 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
                 const colAttr = pSys.geometry.attributes.color;
 
                 // Re-render switch logic
-                pSys.visible = viewMode === 'particles';
-                if (aSys) aSys.visible = viewMode === 'vectors';
+                pSys.visible = viewModeRef.current === 'particles';
+                if (aSys) aSys.visible = viewModeRef.current === 'vectors';
 
                 // Transition Logic
                 if (transitionProgressRef.current < 1) {
@@ -356,7 +358,7 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
                 }
 
                 // VECTOR UPDATE
-                if (viewMode === 'vectors' && aSys && initialPositionsRef.current) {
+                if (viewModeRef.current === 'vectors' && aSys && initialPositionsRef.current) {
                     const VECTOR_COUNT = aSys.count;
                     const dummy = new THREE.Object3D();
                     const initPos = initialPositionsRef.current;
@@ -411,10 +413,16 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
             if (containerRef.current && rendererRef.current) {
                 containerRef.current.removeChild(rendererRef.current.domElement);
             }
-            // Dispose geometries/materials ideally
+            controls.dispose();
+            geometry.dispose();
+            material.dispose();
+            coneGeom.dispose();
+            coneMat.dispose();
+            renderer.dispose();
         };
+        // The scene is created once; mutable controls are synchronized through refs.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [viewMode]);
+    }, []);
 
     // UI Handlers
     const handleGraph = () => updateGraph(equation);
@@ -491,7 +499,7 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
                             { name: "Ripples", eq: "sin(sqrt(x^2 + y^2) - t * 2)" },
                             { name: "Saddle", eq: "x * y" },
                             { name: "Pyramid", eq: "abs(x) + abs(y)" },
-                            { name: "Complex", eq: "(x^2 - y^2) . (x . y)" },
+                            { name: "Peaks", eq: "(x^2 - y^2) * exp(-(x^2 + y^2) / 20)" },
                         ].map(p => (
                             <button
                                 key={p.name}
@@ -506,7 +514,7 @@ export default function GraphSimulation({ onInteractionStateChange }: GraphSimul
 
                 <div className="mt-4 pt-3 border-t border-white/10 text-[10px] text-white/30 flex justify-between">
                     <span>Particles: {PARTICLE_COUNT}</span>
-                    <span>FPS: 60</span>
+                    <span>WebGL / Live</span>
                 </div>
             </div>
         </div>
